@@ -12,7 +12,7 @@ interface SelectedCell {
   value: string;
 }
 
-export const App: React.FC = () => {
+const App: React.FC = () => {
   const [fullSheetData, setFullSheetData] = useState<string[][]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [currentGrid, setCurrentGrid] = useState<string[][]>([]);
