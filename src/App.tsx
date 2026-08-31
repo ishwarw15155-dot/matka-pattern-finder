@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
 
-// --- 15 MATKA FAMILIES WITH UNIQUE COLORS ---
+// --- 15 MATKA FAMILIES WITH UNIQUE PASTEL COLORS ---
 const JODI_FAMILIES: Record<string, { members: string[]; color: string }> = {
   "01": { members: ["01", "10", "06", "60", "51", "15", "56", "65"], color: "#FFE1E6" },
   "02": { members: ["02", "20", "07", "70", "52", "25", "57", "75"], color: "#E2F0D9" },
@@ -45,7 +45,8 @@ const isRedJodi = (jodiStr: string): boolean => {
   return false;
 };
 
-// --- STRICT ABSOLUTE DIFFERENCE: D = |Open - Close| ---
+// --- CORRECT MATKA DIFFERENCE LOGIC ---
+// Ex: 10 -> D-9 | 12 -> D-1 | 96 -> D-7 | 08 -> D-8 | 80 -> D-2
 const calculateMetrics = (jodiStr: string) => {
   if (!jodiStr || jodiStr.length < 2 || jodiStr.includes('*') || jodiStr.includes('✪')) {
     return { diff: null, total: null };
@@ -54,7 +55,7 @@ const calculateMetrics = (jodiStr: string) => {
   const close = parseInt(jodiStr[1], 10);
   if (isNaN(open) || isNaN(close)) return { diff: null, total: null };
 
-  const diff = Math.abs(open - close);
+  const diff = (close - open + 10) % 10;
   const total = (open + close) % 10;
 
   return { diff: `D-${diff}`, total: `T-${total}` };
@@ -303,13 +304,27 @@ const App: React.FC = () => {
                     const formattedVal = formatJodiVal(rawVal);
                     const isSelected = selectedCells.some((cell) => cell.rowIndex === rIdx && cell.colIndex === cIdx);
 
-                    // Check if matched in history
+                    // --- HIGHLIGHT IN MAIN SHEET ---
+                    // 1. Highlight selected cells in original pattern area if matched
+                    // 2. Highlight matched cells in historical matched area
+                    let isMatchedInOriginal = false;
                     let isMatchedInHistory = false;
+
                     if (currentMatch) {
                       const matchStart = currentMatch.startRowIndex;
                       const maxSelRow = selectedCells.length > 0 ? Math.max(...selectedCells.map(c => c.rowIndex)) : 0;
                       const matchEnd = matchStart + (maxSelRow - selectedMinRow);
-                      
+
+                      // Check if this cell is inside the selected pattern area and matched
+                      if (rIdx >= selectedMinRow && rIdx <= maxSelRow) {
+                        const offsetRow = rIdx - selectedMinRow;
+                        const targetHistJodi = formatJodiVal(fullSheetData[matchStart + offsetRow]?.[cIdx] || "");
+                        if (checkSameFamily(formattedVal, targetHistJodi) || formattedVal === targetHistJodi) {
+                          isMatchedInOriginal = true;
+                        }
+                      }
+
+                      // Check if this cell is inside the historical matched block
                       if (rIdx >= matchStart && rIdx <= matchEnd) {
                         const offsetRow = rIdx - matchStart;
                         const matchingSelectedCell = selectedCells.find((c) => (c.rowIndex - selectedMinRow) === offsetRow && c.colIndex === cIdx);
@@ -323,22 +338,22 @@ const App: React.FC = () => {
                     const isRed = isRedJodi(formattedVal);
                     const { diff, total } = calculateMetrics(formattedVal);
 
-                    // COLOR HIGHLIGHT ONLY WHEN MATCHED OR SELECTED
+                    // Priority Background Color Rules
                     let cellBg = '#ffffff';
-                    if (isSelected) {
-                      cellBg = '#a0c4ff'; // Blue selection
-                    } else if (isMatchedInHistory) {
-                      cellBg = famColor; // Highlight with Family Color
+                    if (matchedSets.length === 0 && isSelected) {
+                      cellBg = '#a0c4ff'; // Blue during drag selection only
+                    } else if (isMatchedInOriginal || isMatchedInHistory) {
+                      cellBg = famColor; // Highlight matched cells with Family Color
                     }
 
                     return (
                       <td
                         key={`full-cell-${rIdx}-${cIdx}`}
-                        className={`pdf-jodi-cell ${isSelected ? 'cell-selected' : ''}`}
+                        className="pdf-jodi-cell"
                         style={{ 
                           backgroundColor: cellBg, 
-                          border: isMatchedInHistory ? '2px solid #27ae60' : '1px solid #ccc',
-                          fontWeight: isMatchedInHistory ? 'bold' : 'normal',
+                          border: (isMatchedInOriginal || isMatchedInHistory) ? '2px solid #27ae60' : '1px solid #ccc',
+                          fontWeight: (isMatchedInOriginal || isMatchedInHistory) ? 'bold' : 'normal',
                           cursor: 'pointer' 
                         }}
                         onMouseDown={() => handleMouseDown(rIdx, cIdx, formattedVal)}
@@ -390,7 +405,6 @@ const App: React.FC = () => {
                         const isRed = isRedJodi(formattedVal);
                         const { diff, total } = calculateMetrics(formattedVal);
 
-                        // COLOR HIGHLIGHT ONLY MATCHED CELLS IN RESULT
                         const cellBg = isMatch ? famColor : '#ffffff';
 
                         return (
