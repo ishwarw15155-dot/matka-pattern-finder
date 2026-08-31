@@ -45,7 +45,6 @@ const isRedJodi = (jodiStr: string): boolean => {
   return false;
 };
 
-// --- STRICT MATKA DIFFERENCE LOGIC: Diff = (Close - Open + 10) % 10 ---
 const calculateMetrics = (jodiStr: string) => {
   if (!jodiStr || jodiStr.length < 2 || jodiStr.includes('*') || jodiStr.includes('✪')) {
     return { diff: null, total: null, diffNum: null, totalNum: null };
@@ -93,6 +92,7 @@ interface MatchResult {
   startDate: string;
   startRowIndex: number;
   matchCount: number;
+  matchedPatternLength: number; // Selected Rows count
 }
 
 const App: React.FC = () => {
@@ -170,12 +170,14 @@ const App: React.FC = () => {
     setIsSelecting(false);
   };
 
+  // --- RUN PATTERN SEARCH WITH 10 EXTRA FUTURE ROWS ---
   const runPatternSearch = (): void => {
     if (selectedCells.length === 0 || fullSheetData.length === 0) return;
 
     const minRow = Math.min(...selectedCells.map((c) => c.rowIndex));
     const maxRow = Math.max(...selectedCells.map((c) => c.rowIndex));
     const numRows = maxRow - minRow + 1;
+    const FUTURE_ROWS = 10; // मॅच संपल्यानंतरचे पुढील १० लाईन्स
 
     const matches: MatchResult[] = [];
 
@@ -198,9 +200,18 @@ const App: React.FC = () => {
       }
 
       if (matchCount >= minMatchCount) {
-        const matchBlock = fullSheetData.slice(i, i + numRows);
+        // मोजलेले pattern rows + पुढील १० lines चे slice तयार करा
+        const totalRowsToFetch = numRows + FUTURE_ROWS;
+        const matchBlock = fullSheetData.slice(i, i + totalRowsToFetch);
         const startDate = formatDateString(matchBlock[0]?.[0] || "");
-        matches.push({ matchBlock, startDate, startRowIndex: i, matchCount });
+
+        matches.push({ 
+          matchBlock, 
+          startDate, 
+          startRowIndex: i, 
+          matchCount,
+          matchedPatternLength: numRows 
+        });
       }
     }
 
@@ -232,7 +243,7 @@ const App: React.FC = () => {
         {/* CONTROLS */}
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
           <label style={{ fontSize: '12px' }}>
-            कमकिमान जुळणाऱ्या जोड्या:
+            किमान जुळणाऱ्या जोड्या:
             <select 
               value={minMatchCount} 
               onChange={(e) => setMinMatchCount(parseInt(e.target.value, 10))}
@@ -389,12 +400,10 @@ const App: React.FC = () => {
                         onMouseDown={() => handleMouseDown(rIdx, cIdx, formattedVal)}
                         onMouseEnter={() => handleMouseEnter(rIdx, cIdx)}
                       >
-                        {/* JODI NUMBER SIZE IS KEPT LARGE (14px) */}
                         <div className={`jodi-val ${isRed ? 'red-text' : ''}`} style={{ fontSize: '14px', fontWeight: 'bold', textAlign: 'center', lineHeight: '1.1' }}>
                           {formattedVal || '**'}
                           {isExactJodiMatch && <span style={{ color: '#b71c1c', fontSize: '10px', marginLeft: '1px' }}>★</span>}
                         </div>
-                        {/* COMPACT METRICS ROW BELOW */}
                         <div className="metrics-row" style={{ fontSize: '9px', display: 'flex', justifyContent: 'space-between', padding: '0 2px', marginTop: '1px' }}>
                           <span className="diff-val" style={{ color: '#8b0000', fontWeight: 'bold', backgroundColor: isDiffMatch ? '#fff59d' : 'transparent', padding: '0 1px', borderRadius: '2px' }}>
                             {diff || ''}
@@ -412,7 +421,7 @@ const App: React.FC = () => {
           </table>
         </div>
 
-        {/* RIGHT PANEL: MATCHED RESULT */}
+        {/* RIGHT PANEL: MATCHED RESULT + 10 NEXT ROWS */}
         <div className="matches-wrapper" style={{ flex: 1, overflowX: 'auto' }}>
           {currentMatch ? (
             <div className="panel-container">
@@ -428,72 +437,99 @@ const App: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {currentMatch.matchBlock.map((week, rIdx) => (
-                    <tr key={`match-row-${rIdx}`}>
-                      {week.map((rawVal, cIdx) => {
-                        if (cIdx === 0) {
-                          return <td key={`match-date-${rIdx}`} className="pdf-date-cell" style={{ padding: '2px 1px', fontSize: '10px', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{formatDateString(rawVal)}</td>;
-                        }
+                  {currentMatch.matchBlock.map((week, rIdx) => {
+                    // तपासूया ही रो Pattern मधील आहे की पुढील 10 Lines मधील आहे
+                    const isFutureRow = rIdx >= currentMatch.matchedPatternLength;
 
-                        const formattedVal = formatJodiVal(rawVal);
-                        const targetSelectedCell = selectedCells.find((c) => (c.rowIndex - selectedMinRow) === rIdx && c.colIndex === cIdx);
-
-                        let isMatch = false;
-                        let isExactJodiMatch = false;
-                        let isDiffMatch = false;
-                        let isTotalMatch = false;
-
-                        if (targetSelectedCell) {
-                          if (checkSameFamily(formattedVal, targetSelectedCell.value) || formattedVal === targetSelectedCell.value) {
-                            isMatch = true;
+                    return (
+                      <tr 
+                        key={`match-row-${rIdx}`}
+                        style={{
+                          // पुढील 10 Lines सहज ओळखण्यासाठी फिकट पिवळा/राखाडी बॅकग्राउंड
+                          backgroundColor: isFutureRow ? '#fcf8e3' : 'transparent'
+                        }}
+                      >
+                        {week.map((rawVal, cIdx) => {
+                          if (cIdx === 0) {
+                            return (
+                              <td 
+                                key={`match-date-${rIdx}`} 
+                                className="pdf-date-cell" 
+                                style={{ 
+                                  padding: '2px 1px', 
+                                  fontSize: '10px', 
+                                  whiteSpace: 'nowrap', 
+                                  textOverflow: 'ellipsis', 
+                                  overflow: 'hidden',
+                                  fontWeight: isFutureRow ? 'bold' : 'normal',
+                                  color: isFutureRow ? '#d35400' : 'inherit'
+                                }}
+                              >
+                                {formatDateString(rawVal)} {isFutureRow && rIdx === currentMatch.matchedPatternLength && "⬇"}
+                              </td>
+                            );
                           }
-                          if (formattedVal === targetSelectedCell.value) {
-                            isExactJodiMatch = true;
+
+                          const formattedVal = formatJodiVal(rawVal);
+                          const targetSelectedCell = selectedCells.find((c) => (c.rowIndex - selectedMinRow) === rIdx && c.colIndex === cIdx);
+
+                          let isMatch = false;
+                          let isExactJodiMatch = false;
+                          let isDiffMatch = false;
+                          let isTotalMatch = false;
+
+                          // जर ती Pattern रो असेल तरच मॅच हायलाइट करा
+                          if (!isFutureRow && targetSelectedCell) {
+                            if (checkSameFamily(formattedVal, targetSelectedCell.value) || formattedVal === targetSelectedCell.value) {
+                              isMatch = true;
+                            }
+                            if (formattedVal === targetSelectedCell.value) {
+                              isExactJodiMatch = true;
+                            }
+
+                            const selMetrics = calculateMetrics(targetSelectedCell.value);
+                            const resMetrics = calculateMetrics(formattedVal);
+
+                            if (selMetrics.diffNum !== null && selMetrics.diffNum === resMetrics.diffNum) isDiffMatch = true;
+                            if (selMetrics.totalNum !== null && selMetrics.totalNum === resMetrics.totalNum) isTotalMatch = true;
                           }
 
-                          const selMetrics = calculateMetrics(targetSelectedCell.value);
-                          const resMetrics = calculateMetrics(formattedVal);
+                          const famColor = getFamilyColor(formattedVal);
+                          const isRed = isRedJodi(formattedVal);
+                          const { diff, total } = calculateMetrics(formattedVal);
 
-                          if (selMetrics.diffNum !== null && selMetrics.diffNum === resMetrics.diffNum) isDiffMatch = true;
-                          if (selMetrics.totalNum !== null && selMetrics.totalNum === resMetrics.totalNum) isTotalMatch = true;
-                        }
+                          // Pattern मधील जुळणाऱ्या जोडीला रंग; भविष्यातील 10 ओळींना साधा सफेद किंवा फॅमिली रंग
+                          const cellBg = isMatch ? famColor : isFutureRow ? '#ffffff' : '#ffffff';
 
-                        const famColor = getFamilyColor(formattedVal);
-                        const isRed = isRedJodi(formattedVal);
-                        const { diff, total } = calculateMetrics(formattedVal);
-
-                        const cellBg = isMatch ? famColor : '#ffffff';
-
-                        return (
-                          <td
-                            key={`match-cell-${rIdx}-${cIdx}`}
-                            className="pdf-jodi-cell"
-                            style={{ 
-                              backgroundColor: cellBg, 
-                              border: isExactJodiMatch ? '2px solid #b71c1c' : isMatch ? '2px solid #27ae60' : '1px solid #ccc',
-                              fontWeight: 'bold',
-                              padding: '2px 0px'
-                            }}
-                          >
-                            {/* JODI NUMBER SIZE IS KEPT LARGE (14px) */}
-                            <div className={`jodi-val ${isRed ? 'red-text' : ''}`} style={{ fontSize: '14px', fontWeight: 'bold', textAlign: 'center', lineHeight: '1.1' }}>
-                              {formattedVal || '**'}
-                              {isExactJodiMatch && <span style={{ color: '#b71c1c', fontSize: '10px', marginLeft: '1px' }}>★</span>}
-                            </div>
-                            {/* COMPACT METRICS ROW BELOW */}
-                            <div className="metrics-row" style={{ fontSize: '9px', display: 'flex', justifyContent: 'space-between', padding: '0 2px', marginTop: '1px' }}>
-                              <span className="diff-val" style={{ color: '#8b0000', fontWeight: 'bold', backgroundColor: isDiffMatch ? '#fff59d' : 'transparent', padding: '0 1px', borderRadius: '2px' }}>
-                                {diff || ''}
-                              </span>
-                              <span className="total-val" style={{ color: '#006400', fontWeight: 'bold', backgroundColor: isTotalMatch ? '#fff59d' : 'transparent', padding: '0 1px', borderRadius: '2px' }}>
-                                {total || ''}
-                              </span>
-                            </div>
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
+                          return (
+                            <td
+                              key={`match-cell-${rIdx}-${cIdx}`}
+                              className="pdf-jodi-cell"
+                              style={{ 
+                                backgroundColor: cellBg, 
+                                border: isExactJodiMatch ? '2px solid #b71c1c' : isMatch ? '2px solid #27ae60' : '1px solid #ccc',
+                                fontWeight: 'bold',
+                                padding: '2px 0px'
+                              }}
+                            >
+                              <div className={`jodi-val ${isRed ? 'red-text' : ''}`} style={{ fontSize: '14px', fontWeight: 'bold', textAlign: 'center', lineHeight: '1.1' }}>
+                                {formattedVal || '**'}
+                                {isExactJodiMatch && <span style={{ color: '#b71c1c', fontSize: '10px', marginLeft: '1px' }}>★</span>}
+                              </div>
+                              <div className="metrics-row" style={{ fontSize: '9px', display: 'flex', justifyContent: 'space-between', padding: '0 2px', marginTop: '1px' }}>
+                                <span className="diff-val" style={{ color: '#8b0000', fontWeight: 'bold', backgroundColor: isDiffMatch ? '#fff59d' : 'transparent', padding: '0 1px', borderRadius: '2px' }}>
+                                  {diff || ''}
+                                </span>
+                                <span className="total-val" style={{ color: '#006400', fontWeight: 'bold', backgroundColor: isTotalMatch ? '#fff59d' : 'transparent', padding: '0 1px', borderRadius: '2px' }}>
+                                  {total || ''}
+                                </span>
+                              </div>
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
