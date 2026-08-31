@@ -37,8 +37,7 @@ const checkSameFamily = (jodi1: string, jodi2: string): boolean => {
   return false;
 };
 
-// Difference = Open - Close (Negative values +10)
-// Total = (Open + Close) % 10
+// Absolute Difference Formula: D = |Open - Close|
 const calculateMetrics = (jodiStr: string) => {
   if (!jodiStr || jodiStr.length < 2 || jodiStr.includes('*') || jodiStr.includes('✪')) {
     return { diff: null, total: null };
@@ -47,9 +46,7 @@ const calculateMetrics = (jodiStr: string) => {
   const close = parseInt(jodiStr[1], 10);
   if (isNaN(open) || isNaN(close)) return { diff: null, total: null };
 
-  let diff = open - close;
-  if (diff < 0) diff += 10;
-  
+  const diff = Math.abs(open - close);
   const total = (open + close) % 10;
 
   return { diff: `D-${diff}`, total: `T-${total}` };
@@ -86,11 +83,14 @@ interface CellPosition {
 const App: React.FC = () => {
   const [fullSheetData, setFullSheetData] = useState<string[][]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [matchedSets, setMatchedSets] = useState<{ matchBlock: string[][]; startDate: string }[]>([]);
+  const [matchedSets, setMatchedSets] = useState<{ matchBlock: string[][]; startDate: string; matchCount: number }[]>([]);
   
   const [isSelecting, setIsSelecting] = useState<boolean>(false);
   const [dragStartCell, setDragStartCell] = useState<CellPosition | null>(null);
   const [selectedCells, setSelectedCells] = useState<CellPosition[]>([]);
+  
+  // Minimum required matches in selected pattern (At least 2 or more jodis matched in position)
+  const [minMatchCount, setMinMatchCount] = useState<number>(2);
 
   useEffect(() => {
     const fetchData = async (): Promise<void> => {
@@ -122,7 +122,7 @@ const App: React.FC = () => {
     fetchData();
   }, []);
 
-  // Excel-style Rectangular Selection
+  // Rectangular Drag Selection
   const handleMouseDown = (rIdx: number, cIdx: number, value: string): void => {
     if (cIdx === 0) return;
     setIsSelecting(true);
@@ -166,33 +166,35 @@ const App: React.FC = () => {
     const maxRow = Math.max(...selectedCells.map((c) => c.rowIndex));
     const numRows = maxRow - minRow + 1;
 
-    const matches: { matchBlock: string[][]; startDate: string }[] = [];
+    const matches: { matchBlock: string[][]; startDate: string; matchCount: number }[] = [];
 
+    // Scan history
     for (let i = 0; i <= fullSheetData.length - numRows; i++) {
-      let isMatch = true;
+      if (i === minRow) continue; // Skip current selection
 
-      // Skip comparing selected area with itself
-      if (i === minRow) continue;
+      let matchCount = 0;
 
       for (const cell of selectedCells) {
         const offsetRow = cell.rowIndex - minRow;
         const targetHistJodi = formatJodiVal(fullSheetData[i + offsetRow]?.[cell.colIndex] || "");
 
-        // Match if Jodi is in same family or identical
+        // Check if exact or family match in same day/position
         const isFamMatch = checkSameFamily(cell.value, targetHistJodi);
-        if (!isFamMatch && cell.value !== targetHistJodi) {
-          isMatch = false;
-          break;
+        if (isFamMatch || cell.value === targetHistJodi) {
+          matchCount++;
         }
       }
 
-      if (isMatch) {
+      // If matches are found above the minimum criteria
+      if (matchCount >= minMatchCount) {
         const matchBlock = fullSheetData.slice(i, i + numRows);
         const startDate = formatDateString(matchBlock[0]?.[0] || "");
-        matches.push({ matchBlock, startDate });
+        matches.push({ matchBlock, startDate, matchCount });
       }
     }
 
+    // Sort blocks by highest matches found
+    matches.sort((a, b) => b.matchCount - a.matchCount);
     setMatchedSets(matches);
   };
 
@@ -227,7 +229,7 @@ const App: React.FC = () => {
 
                   const isSelected = isCurrentSet && selectedCells.some((cell) => cell.rowIndex === rIdx && cell.colIndex === cIdx);
 
-                  // Highlights for Matched History Table
+                  // Highlights for History Matches
                   const targetSelectedCell = selectedCells.find(
                     (c) => (c.rowIndex - minRow) === rIdx && c.colIndex === cIdx
                   );
@@ -276,22 +278,48 @@ const App: React.FC = () => {
     <div className="app-wrapper">
       <header className="app-header">
         <h2>Matka Pattern Finder App</h2>
+
+        {/* MINIMUM MATCH FILTER */}
+        <div style={{ textAlign: 'center', marginBottom: '10px' }}>
+          <label style={{ fontSize: '13px', fontWeight: 'bold', marginRight: '10px' }}>
+            कमकिमान किती जोड्या जुळल्या पाहिजेत:
+          </label>
+          <select 
+            value={minMatchCount} 
+            onChange={(e) => {
+              setMinMatchCount(parseInt(e.target.value, 10));
+              if (selectedCells.length > 0) runPatternSearch();
+            }}
+            style={{ padding: '4px 8px', fontSize: '12px' }}
+          >
+            <option value={1}>किमान १ तरी जोडी मॅच असावी</option>
+            <option value={2}>किमान २ जोड्या मॅच असाव्यात (Best)</option>
+            <option value={3}>किमान ३ जोड्या मॅच असाव्यात</option>
+            <option value={5}>किमान ५ जोड्या मॅच असाव्यात</option>
+          </select>
+        </div>
       </header>
 
       <div className="side-by-side-container">
-        {renderTable(fullSheetData, "FULL SHEET HISTORY (SELECT UP TO 20 WEEKS)", true)}
+        {renderTable(fullSheetData, "FULL SHEET HISTORY (1 ते 20 आठवडे ड्रॅग करा)", true)}
 
         <div className="matches-wrapper">
           {matchedSets.length > 0 ? (
             matchedSets.map((item, idx) => (
               <React.Fragment key={`match-${idx}`}>
-                {renderTable(item.matchBlock, `MATCHED PATTERN SET ${idx + 1} (DATE: ${item.startDate})`, false)}
+                {renderTable(
+                  item.matchBlock, 
+                  `MATCHED HISTORICAL PATTERN ${idx + 1} (${item.matchCount} JODIS MATCHED) - DATE: ${item.startDate}`, 
+                  false
+                )}
               </React.Fragment>
             ))
           ) : (
             <div className="panel-container placeholder-panel">
               <h3 className="panel-header">MATCHED HISTORY RESULTS</h3>
-              <p className="placeholder-text">डाव्या बाजूच्या Sheet वर लहान/मोठा भाग (1 ते 20 आठवडे) drag करून सिलेक्ट करा. इतिहासातील मॅच झालेला पॅटर्न रंगांसह उजवीकडे दिसेल.</p>
+              <p className="placeholder-text">
+                डाव्या बाजूच्या Sheet वर १ ते २० आठवडे drag करून सिलेक्ट करा. ज्या ज्या ठिकाणी जोड्या फॅमिली/एक्झॅक्ट जुळतील ते सर्व पॅटर्न उजवीकडे दिसतील.
+              </p>
             </div>
           )}
         </div>
