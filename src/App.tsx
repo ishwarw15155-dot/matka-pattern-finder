@@ -3,29 +3,29 @@ import './App.css';
 
 // --- 15 MATKA FAMILIES WITH UNIQUE COLORS ---
 const JODI_FAMILIES: Record<string, { members: string[]; color: string }> = {
-  "01": { members: ["01", "10", "06", "60", "51", "15", "56", "65"], color: "#FFE1E6" }, // Light Red/Pink
-  "02": { members: ["02", "20", "07", "70", "52", "25", "57", "75"], color: "#E2F0D9" }, // Soft Green
-  "03": { members: ["03", "30", "08", "80", "53", "35", "58", "85"], color: "#FFF2CC" }, // Light Yellow
-  "04": { members: ["04", "40", "09", "90", "54", "45", "59", "95"], color: "#FCE4D6" }, // Light Orange
-  "05": { members: ["05", "50", "00", "55"], color: "#EDEDED" },                         // Light Gray
-  "12": { members: ["12", "21", "17", "71", "62", "26", "67", "76"], color: "#D9E1F2" }, // Light Blue
-  "13": { members: ["13", "31", "18", "81", "63", "36", "68", "86"], color: "#E1D5E7" }, // Light Purple
-  "14": { members: ["14", "41", "19", "91", "64", "46", "69", "96"], color: "#D5E8D4" }, // Mint Green
-  "16": { members: ["16", "61", "11", "66"], color: "#F8CECC" },                         // Pastel Rose
-  "23": { members: ["23", "32", "28", "82", "73", "37", "78", "87"], color: "#DAE8FC" }, // Ice Blue
-  "24": { members: ["24", "42", "29", "92", "74", "47", "79", "97"], color: "#FFF2CC" }, // Cream
-  "27": { members: ["27", "72", "22", "77"], color: "#E1F5FE" },                         // Sky Light
-  "34": { members: ["34", "43", "39", "93", "84", "48", "89", "98"], color: "#F3E5F5" }, // Lavender
-  "38": { members: ["38", "83", "33", "88"], color: "#E8F5E9" },                         // Tea Green
-  "49": { members: ["49", "94", "44", "99"], color: "#FFFDE7" }                          // Soft Lemon
+  "01": { members: ["01", "10", "06", "60", "51", "15", "56", "65"], color: "#FFE1E6" },
+  "02": { members: ["02", "20", "07", "70", "52", "25", "57", "75"], color: "#E2F0D9" },
+  "03": { members: ["03", "30", "08", "80", "53", "35", "58", "85"], color: "#FFF2CC" },
+  "04": { members: ["04", "40", "09", "90", "54", "45", "59", "95"], color: "#FCE4D6" },
+  "05": { members: ["05", "50", "00", "55"], color: "#EDEDED" },
+  "12": { members: ["12", "21", "17", "71", "62", "26", "67", "76"], color: "#D9E1F2" },
+  "13": { members: ["13", "31", "18", "81", "63", "36", "68", "86"], color: "#E1D5E7" },
+  "14": { members: ["14", "41", "19", "91", "64", "46", "69", "96"], color: "#D5E8D4" },
+  "16": { members: ["16", "61", "11", "66"], color: "#F8CECC" },
+  "23": { members: ["23", "32", "28", "82", "73", "37", "78", "87"], color: "#DAE8FC" },
+  "24": { members: ["24", "42", "29", "92", "74", "47", "79", "97"], color: "#FFF2CC" },
+  "27": { members: ["27", "72", "22", "77"], color: "#E1F5FE" },
+  "34": { members: ["34", "43", "39", "93", "84", "48", "89", "98"], color: "#F3E5F5" },
+  "38": { members: ["38", "83", "33", "88"], color: "#E8F5E9" },
+  "49": { members: ["49", "94", "44", "99"], color: "#FFFDE7" }
 };
 
 const getFamilyColor = (jodiStr: string): string => {
-  if (!jodiStr || jodiStr.length < 2 || jodiStr.includes('*') || jodiStr.includes('✪')) return 'transparent';
+  if (!jodiStr || jodiStr.length < 2 || jodiStr.includes('*') || jodiStr.includes('✪')) return '#ffffff';
   for (const fam of Object.values(JODI_FAMILIES)) {
     if (fam.members.includes(jodiStr)) return fam.color;
   }
-  return 'transparent';
+  return '#ffffff';
 };
 
 const checkSameFamily = (jodi1: string, jodi2: string): boolean => {
@@ -45,7 +45,7 @@ const isRedJodi = (jodiStr: string): boolean => {
   return false;
 };
 
-// Accurate Difference Calculation: D = |Open - Close|
+// --- STRICT ABSOLUTE DIFFERENCE: D = |Open - Close| ---
 const calculateMetrics = (jodiStr: string) => {
   if (!jodiStr || jodiStr.length < 2 || jodiStr.includes('*') || jodiStr.includes('✪')) {
     return { diff: null, total: null };
@@ -97,7 +97,7 @@ interface MatchResult {
 
 const App: React.FC = () => {
   const [fullSheetData, setFullSheetData] = useState<string[][]>([]);
-  const [, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(true);
   
   const [isSelecting, setIsSelecting] = useState<boolean>(false);
   const [dragStartCell, setDragStartCell] = useState<CellPosition | null>(null);
@@ -210,6 +210,10 @@ const App: React.FC = () => {
     setCurrentMatchIndex(0);
   };
 
+  if (loading) {
+    return <div style={{ textAlign: 'center', padding: '50px', fontWeight: 'bold' }}>Loading Matka Data...</div>;
+  }
+
   const currentMatch = matchedSets[currentMatchIndex] || null;
   const selectedMinRow = selectedCells.length > 0 ? Math.min(...selectedCells.map((c) => c.rowIndex)) : 0;
 
@@ -220,7 +224,7 @@ const App: React.FC = () => {
           Matka Pattern Finder App
         </h2>
 
-        {/* CONTROLS BAR */}
+        {/* CONTROLS */}
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
           <label style={{ fontSize: '13px' }}>
             कमकिमान जुळणाऱ्या जोड्या:
@@ -299,11 +303,12 @@ const App: React.FC = () => {
                     const formattedVal = formatJodiVal(rawVal);
                     const isSelected = selectedCells.some((cell) => cell.rowIndex === rIdx && cell.colIndex === cIdx);
 
-                    // Check if this row is part of the currently selected Match Result
+                    // Check if matched in history
                     let isMatchedInHistory = false;
                     if (currentMatch) {
                       const matchStart = currentMatch.startRowIndex;
-                      const matchEnd = matchStart + (selectedCells.length > 0 ? (Math.max(...selectedCells.map(c => c.rowIndex)) - selectedMinRow) : 0);
+                      const maxSelRow = selectedCells.length > 0 ? Math.max(...selectedCells.map(c => c.rowIndex)) : 0;
+                      const matchEnd = matchStart + (maxSelRow - selectedMinRow);
                       
                       if (rIdx >= matchStart && rIdx <= matchEnd) {
                         const offsetRow = rIdx - matchStart;
@@ -318,24 +323,33 @@ const App: React.FC = () => {
                     const isRed = isRedJodi(formattedVal);
                     const { diff, total } = calculateMetrics(formattedVal);
 
-                    let cellBg = famColor;
-                    if (isSelected) cellBg = '#a0c4ff'; // Selection highlight
-                    else if (isMatchedInHistory) cellBg = '#ffd166'; // Current Match Highlight in Main Sheet
+                    // COLOR HIGHLIGHT ONLY WHEN MATCHED OR SELECTED
+                    let cellBg = '#ffffff';
+                    if (isSelected) {
+                      cellBg = '#a0c4ff'; // Blue selection
+                    } else if (isMatchedInHistory) {
+                      cellBg = famColor; // Highlight with Family Color
+                    }
 
                     return (
                       <td
                         key={`full-cell-${rIdx}-${cIdx}`}
                         className={`pdf-jodi-cell ${isSelected ? 'cell-selected' : ''}`}
-                        style={{ backgroundColor: cellBg, border: isMatchedInHistory ? '2px solid #d4af37' : '1px solid #ccc', cursor: 'pointer' }}
+                        style={{ 
+                          backgroundColor: cellBg, 
+                          border: isMatchedInHistory ? '2px solid #27ae60' : '1px solid #ccc',
+                          fontWeight: isMatchedInHistory ? 'bold' : 'normal',
+                          cursor: 'pointer' 
+                        }}
                         onMouseDown={() => handleMouseDown(rIdx, cIdx, formattedVal)}
                         onMouseEnter={() => handleMouseEnter(rIdx, cIdx)}
                       >
-                        <div className={`jodi-val ${isRed ? 'red-text' : ''}`} style={{ fontWeight: 'bold' }}>
+                        <div className={`jodi-val ${isRed ? 'red-text' : ''}`}>
                           {formattedVal || '**'}
                         </div>
                         <div className="metrics-row" style={{ fontSize: '9px', display: 'flex', justifyContent: 'space-between' }}>
-                          <span className="diff-val" style={{ color: '#8b0000' }}>{diff || ''}</span>
-                          <span className="total-val" style={{ color: '#006400' }}>{total || ''}</span>
+                          <span className="diff-val" style={{ color: '#8b0000', fontWeight: 'bold' }}>{diff || ''}</span>
+                          <span className="total-val" style={{ color: '#006400', fontWeight: 'bold' }}>{total || ''}</span>
                         </div>
                       </td>
                     );
@@ -346,7 +360,7 @@ const App: React.FC = () => {
           </table>
         </div>
 
-        {/* RIGHT PANEL: CURRENT MATCH RESULT */}
+        {/* RIGHT PANEL: MATCHED RESULT */}
         <div className="matches-wrapper" style={{ flex: 1 }}>
           {currentMatch ? (
             <div className="panel-container">
@@ -376,22 +390,25 @@ const App: React.FC = () => {
                         const isRed = isRedJodi(formattedVal);
                         const { diff, total } = calculateMetrics(formattedVal);
 
+                        // COLOR HIGHLIGHT ONLY MATCHED CELLS IN RESULT
+                        const cellBg = isMatch ? famColor : '#ffffff';
+
                         return (
                           <td
                             key={`match-cell-${rIdx}-${cIdx}`}
                             className="pdf-jodi-cell"
                             style={{ 
-                              backgroundColor: famColor, 
+                              backgroundColor: cellBg, 
                               border: isMatch ? '2px solid #27ae60' : '1px solid #ccc',
-                              outline: isMatch ? '2px solid #27ae60' : 'none'
+                              fontWeight: isMatch ? 'bold' : 'normal'
                             }}
                           >
-                            <div className={`jodi-val ${isRed ? 'red-text' : ''}`} style={{ fontWeight: 'bold' }}>
+                            <div className={`jodi-val ${isRed ? 'red-text' : ''}`}>
                               {formattedVal || '**'}
                             </div>
                             <div className="metrics-row" style={{ fontSize: '9px', display: 'flex', justifyContent: 'space-between' }}>
-                              <span className="diff-val" style={{ color: '#8b0000' }}>{diff || ''}</span>
-                              <span className="total-val" style={{ color: '#006400' }}>{total || ''}</span>
+                              <span className="diff-val" style={{ color: '#8b0000', fontWeight: 'bold' }}>{diff || ''}</span>
+                              <span className="total-val" style={{ color: '#006400', fontWeight: 'bold' }}>{total || ''}</span>
                             </div>
                           </td>
                         );
