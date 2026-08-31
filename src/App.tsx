@@ -37,8 +37,8 @@ const checkSameFamily = (jodi1: string, jodi2: string): boolean => {
   return false;
 };
 
-// --- CORRECT DIFFERENCE & TOTAL CALCULATION ---
-// Ex: 76 -> Diff 9 | 08 -> Diff 8 | 89 -> Diff 1 | 50 -> Diff 5
+// Difference = Open - Close (Negative values +10)
+// Total = (Open + Close) % 10
 const calculateMetrics = (jodiStr: string) => {
   if (!jodiStr || jodiStr.length < 2 || jodiStr.includes('*') || jodiStr.includes('✪')) {
     return { diff: null, total: null };
@@ -47,7 +47,9 @@ const calculateMetrics = (jodiStr: string) => {
   const close = parseInt(jodiStr[1], 10);
   if (isNaN(open) || isNaN(close)) return { diff: null, total: null };
 
-  let diff = (close - open + 10) % 10;
+  let diff = open - close;
+  if (diff < 0) diff += 10;
+  
   const total = (open + close) % 10;
 
   return { diff: `D-${diff}`, total: `T-${total}` };
@@ -77,14 +79,14 @@ const GOOGLE_SHEET_API_URL: string = "https://script.google.com/macros/s/AKfycbx
 
 interface CellPosition {
   rowIndex: number;
-  colIndex: number; // 1 to 6 (MON to SAT)
+  colIndex: number;
   value: string;
 }
 
 const App: React.FC = () => {
   const [fullSheetData, setFullSheetData] = useState<string[][]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [matchedSets, setMatchedSets] = useState<{ matchBlock: string[][]; matchDate: string }[]>([]);
+  const [matchedSets, setMatchedSets] = useState<{ matchBlock: string[][]; startDate: string }[]>([]);
   
   const [isSelecting, setIsSelecting] = useState<boolean>(false);
   const [dragStartCell, setDragStartCell] = useState<CellPosition | null>(null);
@@ -120,7 +122,7 @@ const App: React.FC = () => {
     fetchData();
   }, []);
 
-  // --- RECTANGULAR DRAG & SELECT ---
+  // Excel-style Rectangular Selection
   const handleMouseDown = (rIdx: number, cIdx: number, value: string): void => {
     if (cIdx === 0) return;
     setIsSelecting(true);
@@ -164,19 +166,19 @@ const App: React.FC = () => {
     const maxRow = Math.max(...selectedCells.map((c) => c.rowIndex));
     const numRows = maxRow - minRow + 1;
 
-    const matches: { matchBlock: string[][]; matchDate: string }[] = [];
+    const matches: { matchBlock: string[][]; startDate: string }[] = [];
 
-    // Scan history (Excluding current selected area itself from being matched)
     for (let i = 0; i <= fullSheetData.length - numRows; i++) {
       let isMatch = true;
 
-      // Skip matching with the exact same selected position
+      // Skip comparing selected area with itself
       if (i === minRow) continue;
 
       for (const cell of selectedCells) {
         const offsetRow = cell.rowIndex - minRow;
         const targetHistJodi = formatJodiVal(fullSheetData[i + offsetRow]?.[cell.colIndex] || "");
 
+        // Match if Jodi is in same family or identical
         const isFamMatch = checkSameFamily(cell.value, targetHistJodi);
         if (!isFamMatch && cell.value !== targetHistJodi) {
           isMatch = false;
@@ -185,75 +187,86 @@ const App: React.FC = () => {
       }
 
       if (isMatch) {
-        // Show 6 weeks AFTER the pattern match
-        const afterMatchBlock = fullSheetData.slice(i + numRows, i + numRows + 6);
-        const matchDate = formatDateString(fullSheetData[i]?.[0] || "");
-        
-        if (afterMatchBlock.length > 0) {
-          matches.push({ matchBlock: afterMatchBlock, matchDate });
-        }
+        const matchBlock = fullSheetData.slice(i, i + numRows);
+        const startDate = formatDateString(matchBlock[0]?.[0] || "");
+        matches.push({ matchBlock, startDate });
       }
     }
 
     setMatchedSets(matches);
   };
 
-  const renderTable = (gridData: string[][], title: string, isCurrentSet: boolean) => (
-    <div className={`panel-container ${isCurrentSet ? 'scrollable-panel' : ''}`}>
-      <h3 className="panel-header">{title}</h3>
-      <table className="matka-pdf-table" onMouseUp={handleMouseUp}>
-        <thead>
-          <tr>
-            {DAYS.map((day) => (
-              <th key={day}>{day}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {gridData.map((week, rIdx) => (
-            <tr key={`row-${rIdx}`}>
-              {week.map((rawVal, cIdx) => {
-                const isDateCol = cIdx === 0;
-                const formattedVal = isDateCol ? formatDateString(rawVal) : formatJodiVal(rawVal);
+  const renderTable = (gridData: string[][], title: string, isCurrentSet: boolean) => {
+    const minRow = selectedCells.length > 0 ? Math.min(...selectedCells.map((c) => c.rowIndex)) : 0;
 
-                if (isDateCol) {
+    return (
+      <div className={`panel-container ${isCurrentSet ? 'scrollable-panel' : ''}`}>
+        <h3 className="panel-header">{title}</h3>
+        <table className="matka-pdf-table" onMouseUp={handleMouseUp}>
+          <thead>
+            <tr>
+              {DAYS.map((day) => (
+                <th key={day}>{day}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {gridData.map((week, rIdx) => (
+              <tr key={`row-${rIdx}`}>
+                {week.map((rawVal, cIdx) => {
+                  const isDateCol = cIdx === 0;
+                  const formattedVal = isDateCol ? formatDateString(rawVal) : formatJodiVal(rawVal);
+
+                  if (isDateCol) {
+                    return (
+                      <td key={`cell-${rIdx}-${cIdx}`} className="pdf-date-cell">
+                        {formattedVal}
+                      </td>
+                    );
+                  }
+
+                  const isSelected = isCurrentSet && selectedCells.some((cell) => cell.rowIndex === rIdx && cell.colIndex === cIdx);
+
+                  // Highlights for Matched History Table
+                  const targetSelectedCell = selectedCells.find(
+                    (c) => (c.rowIndex - minRow) === rIdx && c.colIndex === cIdx
+                  );
+
+                  const isExactMatch = !isCurrentSet && targetSelectedCell && formattedVal === targetSelectedCell.value && formattedVal !== "" && !formattedVal.includes('*');
+                  const isFamilyMatch = !isCurrentSet && targetSelectedCell && checkSameFamily(formattedVal, targetSelectedCell.value);
+
+                  const isRed = isRedJodi(formattedVal);
+                  const { diff, total } = calculateMetrics(formattedVal);
+
+                  let cellClass = "pdf-jodi-cell";
+                  if (isSelected) cellClass += " cell-selected";
+                  if (isExactMatch) cellClass += " exact-family-match";
+                  else if (isFamilyMatch) cellClass += " group-family-match";
+
                   return (
-                    <td key={`cell-${rIdx}-${cIdx}`} className="pdf-date-cell">
-                      {formattedVal}
+                    <td
+                      key={`cell-${rIdx}-${cIdx}`}
+                      className={cellClass}
+                      onMouseDown={() => isCurrentSet && handleMouseDown(rIdx, cIdx, formattedVal)}
+                      onMouseEnter={() => isCurrentSet && handleMouseEnter(rIdx, cIdx)}
+                    >
+                      <div className={`jodi-val ${isRed ? 'red-text' : ''}`}>
+                        {formattedVal || '**'}
+                      </div>
+                      <div className="metrics-row">
+                        <span className="diff-val">{diff || ''}</span>
+                        <span className="total-val">{total || ''}</span>
+                      </div>
                     </td>
                   );
-                }
-
-                const isSelected = isCurrentSet && selectedCells.some((cell) => cell.rowIndex === rIdx && cell.colIndex === cIdx);
-                const isRed = isRedJodi(formattedVal);
-                const { diff, total } = calculateMetrics(formattedVal);
-
-                let cellClass = "pdf-jodi-cell";
-                if (isSelected) cellClass += " cell-selected";
-
-                return (
-                  <td
-                    key={`cell-${rIdx}-${cIdx}`}
-                    className={cellClass}
-                    onMouseDown={() => isCurrentSet && handleMouseDown(rIdx, cIdx, formattedVal)}
-                    onMouseEnter={() => isCurrentSet && handleMouseEnter(rIdx, cIdx)}
-                  >
-                    <div className={`jodi-val ${isRed ? 'red-text' : ''}`}>
-                      {formattedVal || '**'}
-                    </div>
-                    <div className="metrics-row">
-                      <span className="diff-val">{diff || ''}</span>
-                      <span className="total-val">{total || ''}</span>
-                    </div>
-                  </td>
-                );
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
 
   if (loading) {
     return <div className="loading-spinner">Loading Matka Chart Data...</div>;
@@ -272,13 +285,13 @@ const App: React.FC = () => {
           {matchedSets.length > 0 ? (
             matchedSets.map((item, idx) => (
               <React.Fragment key={`match-${idx}`}>
-                {renderTable(item.matchBlock, `MATCHED HISTORICAL PATTERN ${idx + 1} (PATTERN DATE: ${item.matchDate})`, false)}
+                {renderTable(item.matchBlock, `MATCHED PATTERN SET ${idx + 1} (DATE: ${item.startDate})`, false)}
               </React.Fragment>
             ))
           ) : (
             <div className="panel-container placeholder-panel">
               <h3 className="panel-header">MATCHED HISTORY RESULTS</h3>
-              <p className="placeholder-text">डाव्या बाजूच्या Sheet वर 1 ते 20 आठवडे drag करून सिलेक्ट करा. इतिहासातील मॅच झालेला पुढील पॅटर्न येथे दिसेल.</p>
+              <p className="placeholder-text">डाव्या बाजूच्या Sheet वर लहान/मोठा भाग (1 ते 20 आठवडे) drag करून सिलेक्ट करा. इतिहासातील मॅच झालेला पॅटर्न रंगांसह उजवीकडे दिसेल.</p>
             </div>
           )}
         </div>
