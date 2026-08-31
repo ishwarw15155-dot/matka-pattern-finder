@@ -6,11 +6,6 @@ export interface JodiMetrics {
   diff: number | null;
 }
 
-export const CUT_DIGITS: Record<number, number> = {
-  0: 5, 1: 6, 2: 7, 3: 8, 4: 9,
-  5: 0, 6: 1, 7: 2, 8: 3, 9: 4
-};
-
 export const JODI_FAMILIES: Record<string, string[]> = {
   "01": ["01", "10", "06", "60", "51", "15", "56", "65"],
   "02": ["02", "20", "07", "70", "52", "25", "57", "75"],
