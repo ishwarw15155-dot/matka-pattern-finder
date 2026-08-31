@@ -2,14 +2,6 @@ import React, { useState, useEffect } from 'react';
 import './App.css';
 
 // --- MATKA LOGIC HELPERS ---
-interface JodiMetrics {
-  jodi: string;
-  totalStr: string;
-  diffStr: string;
-  total: number | null;
-  diff: number | null;
-}
-
 const JODI_FAMILIES: Record<string, string[]> = {
   "01": ["01", "10", "06", "60", "51", "15", "56", "65"],
   "02": ["02", "20", "07", "70", "52", "25", "57", "75"],
@@ -28,14 +20,14 @@ const JODI_FAMILIES: Record<string, string[]> = {
   "49": ["49", "94", "44", "99"]
 };
 
-const calculateMatkaDiff = (open: number, close: number): number => {
-  let diff = open - close;
-  if (diff < 0) diff += 10;
-  return diff;
-};
-
-const calculateMatkaTotal = (open: number, close: number): number => {
-  return (open + close) % 10;
+// Check if a Jodi is Red (Red / Half-Red / Cut)
+const isRedJodi = (jodiStr: string): boolean => {
+  if (!jodiStr || jodiStr.length < 2) return false;
+  const redFamilies = ["05", "16", "27", "38", "49"];
+  for (const famKey of redFamilies) {
+    if (JODI_FAMILIES[famKey].includes(jodiStr)) return true;
+  }
+  return false;
 };
 
 const checkSameFamily = (jodi1: string, jodi2: string): boolean => {
@@ -46,24 +38,36 @@ const checkSameFamily = (jodi1: string, jodi2: string): boolean => {
   return false;
 };
 
-const getJodiMetrics = (jodiStr: string): JodiMetrics => {
-  if (!jodiStr || jodiStr.length < 2 || jodiStr.includes('*') || jodiStr.includes('✪')) {
-    return { jodi: jodiStr || '**', totalStr: '', diffStr: '', total: null, diff: null };
-  }
-  const open = parseInt(jodiStr[0], 10);
-  const close = parseInt(jodiStr[1], 10);
-
-  if (isNaN(open) || isNaN(close)) {
-    return { jodi: jodiStr, totalStr: '', diffStr: '', total: null, diff: null };
+// Helper to format raw dates into DD-MM-YYYY format
+const formatDateString = (dateVal: string): string => {
+  if (!dateVal || dateVal.startsWith('#')) return '---';
+  
+  // If already DD-MM-YYYY or DD/MM/YYYY
+  if (/^\d{2}[-/]\d{2}[-/]\d{4}$/.test(dateVal)) {
+    return dateVal.replace(/\//g, '-');
   }
 
-  const total = calculateMatkaTotal(open, close);
-  const diff = calculateMatkaDiff(open, close);
+  const parsed = new Date(dateVal);
+  if (!isNaN(parsed.getTime())) {
+    const day = String(parsed.getDate()).padStart(2, '0');
+    const month = String(parsed.getMonth() + 1).padStart(2, '0');
+    const year = parsed.getFullYear();
+    return `${day}-${month}-${year}`;
+  }
 
-  return { jodi: jodiStr, totalStr: `T-${total}`, diffStr: `D-${diff}`, total, diff };
+  return dateVal;
 };
 
-// --- APP COMPONENT ---
+// Ensure single digits display with leading zero (e.g. 3 -> 03)
+const formatJodiVal = (val: string): string => {
+  if (!val) return '';
+  const trimmed = val.trim();
+  if (/^\d$/.test(trimmed)) {
+    return `0${trimmed}`;
+  }
+  return trimmed;
+};
+
 const DAYS: string[] = ["DATE", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 const GOOGLE_SHEET_API_URL: string = "https://script.google.com/macros/s/AKfycbxl1Qq4yqrRuvYC_H3ZsMDXyUGZw245Ws3kWm8l075Osb0WyZktd6QJosOe_jdgHECd/exec";
 
@@ -96,9 +100,8 @@ const App: React.FC = () => {
             row.map((cell) => (cell !== null && cell !== undefined ? String(cell).trim() : ""))
           );
 
-          // Filter out header row if present
           const cleanData = formattedData.filter(
-            (row) => row[0] && !row[0].toUpperCase().includes("DATE")
+            (row) => row.some(c => c !== "") && !String(row[0]).toUpperCase().includes("DATE")
           );
 
           setFullSheetData(cleanData);
@@ -115,13 +118,13 @@ const App: React.FC = () => {
   }, []);
 
   const handleMouseDown = (rIdx: number, cIdx: number, value: string): void => {
-    if (cIdx === 0) return; // Ignore Date column selection
+    if (cIdx === 0) return;
     setIsSelecting(true);
     setSelectedCells([{ rowIndex: rIdx, colIndex: cIdx, value }]);
   };
 
   const handleMouseEnter = (rIdx: number, cIdx: number, value: string): void => {
-    if (cIdx === 0) return; // Ignore Date column selection
+    if (cIdx === 0) return;
     if (isSelecting) {
       const exists = selectedCells.some(
         (cell) => cell.rowIndex === rIdx && cell.colIndex === cIdx
@@ -154,7 +157,7 @@ const App: React.FC = () => {
 
       for (const cell of selectedCells) {
         const offsetRow = cell.rowIndex - minRow;
-        const targetHistJodi = historicalData[i + offsetRow]?.[cell.colIndex] || "";
+        const targetHistJodi = formatJodiVal(historicalData[i + offsetRow]?.[cell.colIndex] || "");
 
         const isFamMatch = checkSameFamily(cell.value, targetHistJodi);
         if (!isFamMatch && cell.value !== targetHistJodi) {
@@ -175,7 +178,7 @@ const App: React.FC = () => {
   const renderTable = (gridData: string[][], title: string, isCurrentSet: boolean) => (
     <div className="panel-container">
       <h3 className="panel-header">{title}</h3>
-      <table className="matka-table" onMouseUp={handleMouseUp}>
+      <table className="matka-sheet-table" onMouseUp={handleMouseUp}>
         <thead>
           <tr>
             {DAYS.map((day) => (
@@ -186,42 +189,35 @@ const App: React.FC = () => {
         <tbody>
           {gridData.map((week, rIdx) => (
             <tr key={`row-${rIdx}`}>
-              {week.map((jodiVal, cIdx) => {
+              {week.map((rawVal, cIdx) => {
                 const isDateColumn = cIdx === 0;
+                const formattedVal = isDateColumn ? formatDateString(rawVal) : formatJodiVal(rawVal);
+
                 const isSelected = isCurrentSet && selectedCells.some(
                   (cell) => cell.rowIndex === rIdx && cell.colIndex === cIdx
                 );
 
-                const currentSelectedJodi = currentGrid[rIdx]?.[cIdx] || "";
+                const currentSelectedJodi = formatJodiVal(currentGrid[rIdx]?.[cIdx] || "");
                 
-                const isFamilyMatch = !isDateColumn && checkSameFamily(jodiVal, currentSelectedJodi);
-                const isExactMatch = !isDateColumn && jodiVal === currentSelectedJodi && jodiVal !== "" && !jodiVal.includes('*');
+                const isFamilyMatch = !isDateColumn && checkSameFamily(formattedVal, currentSelectedJodi);
+                const isExactMatch = !isDateColumn && formattedVal === currentSelectedJodi && formattedVal !== "" && !formattedVal.includes('*');
 
-                const { jodi, totalStr, diffStr } = getJodiMetrics(jodiVal);
+                const isRed = !isDateColumn && isRedJodi(formattedVal);
 
-                let cellClass = isDateColumn ? "date-cell" : "matka-cell";
+                let cellClass = isDateColumn ? "sheet-date-cell" : "sheet-jodi-cell";
                 if (isSelected) cellClass += " cell-selected";
                 if (!isCurrentSet && isExactMatch) cellClass += " exact-family-match";
                 else if (!isCurrentSet && isFamilyMatch) cellClass += " group-family-match";
+                if (isRed) cellClass += " red-jodi";
 
                 return (
                   <td
                     key={`cell-${rIdx}-${cIdx}`}
                     className={cellClass}
-                    onMouseDown={() => isCurrentSet && handleMouseDown(rIdx, cIdx, jodiVal)}
-                    onMouseEnter={() => isCurrentSet && handleMouseEnter(rIdx, cIdx, jodiVal)}
+                    onMouseDown={() => isCurrentSet && handleMouseDown(rIdx, cIdx, formattedVal)}
+                    onMouseEnter={() => isCurrentSet && handleMouseEnter(rIdx, cIdx, formattedVal)}
                   >
-                    {isDateColumn ? (
-                      <span className="date-value">{jodiVal}</span>
-                    ) : (
-                      <>
-                        <div className="jodi-number">{jodi}</div>
-                        <div className="metrics-container">
-                          {diffStr ? <span className="diff-label">{diffStr}</span> : null}
-                          {totalStr ? <span className="total-label">{totalStr}</span> : null}
-                        </div>
-                      </>
-                    )}
+                    {formattedVal}
                   </td>
                 );
               })}
@@ -233,7 +229,7 @@ const App: React.FC = () => {
   );
 
   if (loading) {
-    return <div className="loading-spinner">Loading Matka Data...</div>;
+    return <div className="loading-spinner">Loading Matka Chart...</div>;
   }
 
   return (
