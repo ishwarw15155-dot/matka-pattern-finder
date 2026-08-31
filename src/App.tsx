@@ -97,7 +97,7 @@ interface MatchResult {
 
 const App: React.FC = () => {
   const [fullSheetData, setFullSheetData] = useState<string[][]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [ setLoading] = useState<boolean>(true);
   
   const [isSelecting, setIsSelecting] = useState<boolean>(false);
   const [dragStartCell, setDragStartCell] = useState<CellPosition | null>(null);
