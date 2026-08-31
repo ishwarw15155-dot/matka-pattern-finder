@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
 
-// --- MATKA LOGIC HELPERS ---
+// --- MATKA FAMILY GROUPS ---
 const JODI_FAMILIES: Record<string, string[]> = {
   "01": ["01", "10", "06", "60", "51", "15", "56", "65"],
   "02": ["02", "20", "07", "70", "52", "25", "57", "75"],
@@ -30,29 +30,27 @@ const isRedJodi = (jodiStr: string): boolean => {
 };
 
 const checkSameFamily = (jodi1: string, jodi2: string): boolean => {
-  if (!jodi1 || !jodi2 || jodi1.includes('*') || jodi2.includes('*') || jodi1.includes('✪') || jodi2.includes('✪')) return false;
+  if (!jodi1 || !jodi2 || jodi1.includes('*') || jodi2.includes('*') || jodi1.includes('✪')) return false;
   for (const family of Object.values(JODI_FAMILIES)) {
     if (family.includes(jodi1) && family.includes(jodi2)) return true;
   }
   return false;
 };
 
-// --- CORRECT DIFFERENCE & TOTAL CALCULATION ---
-// Difference = Open - Close (If negative, add 10)
-const calculateMetrics = (jodiStr: string) => {
+// Difference & Total Calculation
+const getDiffAndTotalVal = (jodiStr: string) => {
   if (!jodiStr || jodiStr.length < 2 || jodiStr.includes('*') || jodiStr.includes('✪')) {
-    return { diff: null, total: null };
+    return { diffVal: null, totalVal: null };
   }
   const open = parseInt(jodiStr[0], 10);
   const close = parseInt(jodiStr[1], 10);
-  if (isNaN(open) || isNaN(close)) return { diff: null, total: null };
+  if (isNaN(open) || isNaN(close)) return { diffVal: null, totalVal: null };
 
   let diff = open - close;
   if (diff < 0) diff += 10;
-  
   const total = (open + close) % 10;
 
-  return { diff: `D-${diff}`, total: `T-${total}` };
+  return { diffVal: diff, totalVal: total };
 };
 
 const formatJodiVal = (val: string): string => {
@@ -61,12 +59,25 @@ const formatJodiVal = (val: string): string => {
   return /^\d$/.test(trimmed) ? `0${trimmed}` : trimmed;
 };
 
-const DAYS: string[] = ["MON", "TUE", "WED", "THU", "FRI", "SAT"];
+const formatDateString = (dateVal: string): string => {
+  if (!dateVal || dateVal.startsWith('#')) return '---';
+  if (/^\d{2}[-/]\d{2}[-/]\d{4}$/.test(dateVal)) return dateVal.replace(/\//g, '-');
+  const parsed = new Date(dateVal);
+  if (!isNaN(parsed.getTime())) {
+    const day = String(parsed.getDate()).padStart(2, '0');
+    const month = String(parsed.getMonth() + 1).padStart(2, '0');
+    const year = parsed.getFullYear();
+    return `${day}-${month}-${year}`;
+  }
+  return dateVal;
+};
+
+const DAYS: string[] = ["DATE", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 const GOOGLE_SHEET_API_URL: string = "https://script.google.com/macros/s/AKfycbxl1Qq4yqrRuvYC_H3ZsMDXyUGZw245Ws3kWm8l075Osb0WyZktd6QJosOe_jdgHECd/exec";
 
 interface SelectedCell {
   rowIndex: number;
-  colIndex: number;
+  colIndex: number; // 1 to 6 (MON to SAT)
   value: string;
 }
 
@@ -108,17 +119,16 @@ const App: React.FC = () => {
   }, []);
 
   const handleMouseDown = (rIdx: number, cIdx: number, value: string): void => {
+    if (cIdx === 0) return; // Prevent selecting Date column
     setIsSelecting(true);
     setSelectedCells([{ rowIndex: rIdx, colIndex: cIdx, value }]);
   };
 
   const handleMouseEnter = (rIdx: number, cIdx: number, value: string): void => {
+    if (cIdx === 0) return;
     if (isSelecting) {
-      const exists = selectedCells.some(
-        (cell) => cell.rowIndex === rIdx && cell.colIndex === cIdx
-      );
+      const exists = selectedCells.some((cell) => cell.rowIndex === rIdx && cell.colIndex === cIdx);
       if (!exists) {
-        // Enforce max selection limit of 20 weeks height
         const minRow = Math.min(...selectedCells.map((c) => c.rowIndex), rIdx);
         const maxRow = Math.max(...selectedCells.map((c) => c.rowIndex), rIdx);
         if (maxRow - minRow + 1 <= 20) {
@@ -149,7 +159,7 @@ const App: React.FC = () => {
 
       for (const cell of selectedCells) {
         const offsetRow = cell.rowIndex - minRow;
-        const targetHistJodi = formatJodiVal(fullSheetData[i + offsetRow]?.[cell.colIndex + 1] || "");
+        const targetHistJodi = formatJodiVal(fullSheetData[i + offsetRow]?.[cell.colIndex] || "");
 
         const isFamMatch = checkSameFamily(cell.value, targetHistJodi);
         if (!isFamMatch && cell.value !== targetHistJodi) {
@@ -179,50 +189,86 @@ const App: React.FC = () => {
           </tr>
         </thead>
         <tbody>
-          {gridData.map((week, rIdx) => {
-            const dayCells = week.slice(1, 7);
+          {gridData.map((week, rIdx) => (
+            <tr key={`row-${rIdx}`}>
+              {week.map((rawVal, cIdx) => {
+                const isDateCol = cIdx === 0;
+                const formattedVal = isDateCol ? formatDateString(rawVal) : formatJodiVal(rawVal);
 
-            return (
-              <tr key={`row-${rIdx}`}>
-                {dayCells.map((rawVal, cIdx) => {
-                  const formattedVal = formatJodiVal(rawVal);
-                  const isSelected = isCurrentSet && selectedCells.some(
-                    (cell) => cell.rowIndex === rIdx && cell.colIndex === cIdx
-                  );
-
-                  const isRed = isRedJodi(formattedVal);
-                  const { diff, total } = calculateMetrics(formattedVal);
-
-                  let cellClass = "pdf-jodi-cell";
-                  if (isSelected) cellClass += " cell-selected";
-
+                if (isDateCol) {
                   return (
-                    <td
-                      key={`cell-${rIdx}-${cIdx}`}
-                      className={cellClass}
-                      onMouseDown={() => isCurrentSet && handleMouseDown(rIdx, cIdx, formattedVal)}
-                      onMouseEnter={() => isCurrentSet && handleMouseEnter(rIdx, cIdx, formattedVal)}
-                    >
-                      <div className={`jodi-val ${isRed ? 'red-text' : ''}`}>
-                        {formattedVal || '**'}
-                      </div>
-                      <div className="metrics-row">
-                        <span className="diff-val">{diff}</span>
-                        <span className="total-val">{total}</span>
-                      </div>
+                    <td key={`cell-${rIdx}-${cIdx}`} className="pdf-date-cell">
+                      {formattedVal}
                     </td>
                   );
-                })}
-              </tr>
-            );
-          })}
+                }
+
+                const isSelected = isCurrentSet && selectedCells.some((cell) => cell.rowIndex === rIdx && cell.colIndex === cIdx);
+
+                // Target cell for comparing history match logic
+                const targetSelectedCell = selectedCells.find((c) => c.colIndex === cIdx);
+                const isExactMatch = !isCurrentSet && targetSelectedCell && formattedVal === targetSelectedCell.value && formattedVal !== "" && !formattedVal.includes('*');
+                const isFamilyMatch = !isCurrentSet && targetSelectedCell && checkSameFamily(formattedVal, targetSelectedCell.value);
+
+                // Exact Total & Difference Matching for surrounding non-selected cells
+                let showDiff: string | null = null;
+                let showTotal: string | null = null;
+
+                const { diffVal, totalVal } = getDiffAndTotalVal(formattedVal);
+
+                if (diffVal !== null && totalVal !== null) {
+                  // Find corresponding row source if available
+                  const sourceJodiVal = isCurrentSet
+                    ? currentGridRowSource(rIdx, cIdx)
+                    : targetSelectedCell ? targetSelectedCell.value : null;
+
+                  if (sourceJodiVal) {
+                    const sourceMetrics = getDiffAndTotalVal(sourceJodiVal);
+                    if (sourceMetrics.diffVal === diffVal) showDiff = `D-${diffVal}`;
+                    if (sourceMetrics.totalVal === totalVal) showTotal = `T-${totalVal}`;
+                  }
+                }
+
+                const isRed = isRedJodi(formattedVal);
+
+                let cellClass = "pdf-jodi-cell";
+                if (isSelected) cellClass += " cell-selected";
+                if (isExactMatch) cellClass += " exact-family-match";
+                else if (isFamilyMatch) cellClass += " group-family-match";
+
+                return (
+                  <td
+                    key={`cell-${rIdx}-${cIdx}`}
+                    className={cellClass}
+                    onMouseDown={() => isCurrentSet && handleMouseDown(rIdx, cIdx, formattedVal)}
+                    onMouseEnter={() => isCurrentSet && handleMouseEnter(rIdx, cIdx, formattedVal)}
+                  >
+                    <div className={`jodi-val ${isRed ? 'red-text' : ''}`}>
+                      {formattedVal || '**'}
+                    </div>
+                    {(showDiff || showTotal) && (
+                      <div className="metrics-row">
+                        <span className="diff-val">{showDiff || ''}</span>
+                        <span className="total-val">{showTotal || ''}</span>
+                      </div>
+                    )}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
         </tbody>
       </table>
     </div>
   );
 
+  // Helper function to get source cell for left grid
+  const currentGridRowSource = (rIdx: number, cIdx: number) => {
+    return formatJodiVal(fullSheetData[rIdx]?.[cIdx] || "");
+  };
+
   if (loading) {
-    return <div className="loading-spinner">Loading Matka Chart...</div>;
+    return <div className="loading-spinner">Loading Matka Chart Data...</div>;
   }
 
   return (
@@ -232,19 +278,19 @@ const App: React.FC = () => {
       </header>
 
       <div className="side-by-side-container">
-        {renderTable(fullSheetData, "FULL SHEET (DRAG TO SELECT UP TO 20 WEEKS)", true)}
+        {renderTable(fullSheetData, "FULL SHEET HISTORY (SELECT UP TO 20 WEEKS)", true)}
 
         <div className="matches-wrapper">
           {matchedSets.length > 0 ? (
             matchedSets.map((matchBlock, idx) => (
               <React.Fragment key={`match-${idx}`}>
-                {renderTable(matchBlock, `FOUND MATCH HISTORY SET ${idx + 1}`, false)}
+                {renderTable(matchBlock, `MATCHED PATTERN ${idx + 1} (${formatDateString(matchBlock[0][0])})`, false)}
               </React.Fragment>
             ))
           ) : (
             <div className="panel-container placeholder-panel">
-              <h3 className="panel-header">FOUND MATCH HISTORY SET 1</h3>
-              <p className="placeholder-text">Select cells on the left grid to run similarity search.</p>
+              <h3 className="panel-header">MATCHED HISTORY RESULTS</h3>
+              <p className="placeholder-text">डाव्या बाजूच्या Sheet वर 1 ते 20 आठवडे drag आणि select करा.</p>
             </div>
           )}
         </div>
