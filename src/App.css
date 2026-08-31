@@ -27,7 +27,7 @@ body {
   align-items: flex-start;
 }
 
-/* SCROLLABLE LEFT PANEL FOR FULL SHEET */
+/* Scrollable panel for left side */
 .scrollable-panel {
   max-height: 80vh;
   overflow-y: auto;
@@ -40,7 +40,7 @@ body {
   border: 1px solid #000;
   padding: 4px;
   flex: 1;
-  min-width: 360px;
+  min-width: 380px;
 }
 
 .matches-wrapper {
@@ -65,7 +65,6 @@ body {
   z-index: 2;
 }
 
-/* TABLE STYLING */
 .matka-pdf-table {
   width: 100%;
   border-collapse: collapse;
@@ -75,57 +74,74 @@ body {
 
 .matka-pdf-table th {
   border: 1px solid #000;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: bold;
   padding: 4px;
   text-align: center;
   position: sticky;
-  top: 25px;
+  top: 23px;
   background: #fff;
   z-index: 1;
+}
+
+.pdf-date-cell {
+  border: 1px solid #000;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+  padding: 2px;
+  background-color: #fafafa;
+  white-space: nowrap;
 }
 
 .pdf-jodi-cell {
   border: 1px solid #000;
   text-align: center;
   padding: 3px 2px;
-  height: 44px;
+  height: 42px;
   vertical-align: middle;
   cursor: pointer;
 }
 
 .jodi-val {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: bold;
   color: #000;
-  line-height: 1.1;
 }
 
 .red-text {
   color: #d32f2f !important;
 }
 
-/* METRICS INSIDE CELL */
+/* Show D-X and T-X only when matched */
 .metrics-row {
   display: flex;
   justify-content: space-between;
-  padding: 0 4px;
-  margin-top: 2px;
+  padding: 0 2px;
+  margin-top: 1px;
   font-size: 10px;
   font-weight: bold;
 }
 
 .diff-val {
-  color: #a52a2a; /* Brown */
+  color: #a52a2a;
 }
 
 .total-val {
-  color: #2e7d32; /* Green */
+  color: #2e7d32;
 }
 
-/* HIGHLIGHTS */
+/* Match Highlights */
 .cell-selected {
   background-color: #bbdefb !important;
+}
+
+.exact-family-match {
+  background-color: #c8e6c9 !important; /* Green for exact */
+}
+
+.group-family-match {
+  background-color: #fff9c4 !important; /* Yellow for family */
 }
 
 .loading-spinner {
