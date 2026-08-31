@@ -106,7 +106,7 @@ const App: React.FC = () => {
   const [matchedSets, setMatchedSets] = useState<MatchResult[]>([]);
   const [currentMatchIndex, setCurrentMatchIndex] = useState<number>(0);
   const [minMatchCount, setMinMatchCount] = useState<number>(2);
-  const [strictMode, setStrictMode] = useState<boolean>(false); // Strict Exact Match Mode
+  const [strictMode, setStrictMode] = useState<boolean>(false);
 
   useEffect(() => {
     const fetchData = async (): Promise<void> => {
@@ -223,20 +223,20 @@ const App: React.FC = () => {
   const selectedMinRow = selectedCells.length > 0 ? Math.min(...selectedCells.map((c) => c.rowIndex)) : 0;
 
   return (
-    <div className="app-wrapper" style={{ fontSize: '11px' }}>
-      <header className="app-header" style={{ padding: '6px', background: '#2c3e50', color: '#fff' }}>
-        <h2 style={{ margin: '0 0 6px 0', fontSize: '15px', textAlign: 'center' }}>
+    <div className="app-wrapper">
+      <header className="app-header" style={{ padding: '8px', background: '#2c3e50', color: '#fff' }}>
+        <h2 style={{ margin: '0 0 6px 0', fontSize: '16px', textAlign: 'center' }}>
           Matka Pattern Finder App
         </h2>
 
         {/* CONTROLS */}
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-          <label style={{ fontSize: '11px' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          <label style={{ fontSize: '12px' }}>
             कमकिमान जुळणाऱ्या जोड्या:
             <select 
               value={minMatchCount} 
               onChange={(e) => setMinMatchCount(parseInt(e.target.value, 10))}
-              style={{ marginLeft: '4px', padding: '2px', fontSize: '11px' }}
+              style={{ marginLeft: '4px', padding: '2px', fontSize: '12px' }}
             >
               <option value={1}>1+</option>
               <option value={2}>2+</option>
@@ -245,7 +245,7 @@ const App: React.FC = () => {
             </select>
           </label>
 
-          <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#ffeb3b', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}>
+          <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#ffeb3b', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
             <input 
               type="checkbox" 
               checked={strictMode} 
@@ -257,34 +257,34 @@ const App: React.FC = () => {
           <button 
             onClick={runPatternSearch} 
             disabled={selectedCells.length === 0}
-            style={{ padding: '3px 10px', fontWeight: 'bold', backgroundColor: '#27ae60', color: '#fff', border: 'none', borderRadius: '3px', cursor: 'pointer', fontSize: '11px' }}
+            style={{ padding: '4px 12px', fontWeight: 'bold', backgroundColor: '#27ae60', color: '#fff', border: 'none', borderRadius: '3px', cursor: 'pointer', fontSize: '12px' }}
           >
             Find Pattern
           </button>
 
           <button 
             onClick={handleReset}
-            style={{ padding: '3px 10px', fontWeight: 'bold', backgroundColor: '#e74c3c', color: '#fff', border: 'none', borderRadius: '3px', cursor: 'pointer', fontSize: '11px' }}
+            style={{ padding: '4px 12px', fontWeight: 'bold', backgroundColor: '#e74c3c', color: '#fff', border: 'none', borderRadius: '3px', cursor: 'pointer', fontSize: '12px' }}
           >
             Reset
           </button>
 
           {matchedSets.length > 0 && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: '6px', background: '#34495e', padding: '2px 6px', borderRadius: '3px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: '6px', background: '#34495e', padding: '3px 6px', borderRadius: '3px' }}>
               <button 
                 onClick={() => setCurrentMatchIndex((prev) => Math.max(0, prev - 1))}
                 disabled={currentMatchIndex === 0}
-                style={{ cursor: 'pointer', fontSize: '10px' }}
+                style={{ cursor: 'pointer', fontSize: '11px' }}
               >
                 ◀ Prev
               </button>
-              <span style={{ fontSize: '11px', fontWeight: 'bold' }}>
+              <span style={{ fontSize: '12px', fontWeight: 'bold' }}>
                 Match {currentMatchIndex + 1} of {matchedSets.length}
               </span>
               <button 
                 onClick={() => setCurrentMatchIndex((prev) => Math.min(matchedSets.length - 1, prev + 1))}
                 disabled={currentMatchIndex === matchedSets.length - 1}
-                style={{ cursor: 'pointer', fontSize: '10px' }}
+                style={{ cursor: 'pointer', fontSize: '11px' }}
               >
                 Next ▶
               </button>
@@ -293,17 +293,19 @@ const App: React.FC = () => {
         </div>
       </header>
 
-      <div className="side-by-side-container" style={{ display: 'flex', gap: '8px', padding: '6px' }}>
+      <div className="side-by-side-container" style={{ display: 'flex', gap: '10px', padding: '8px' }}>
         
         {/* LEFT PANEL: FULL SHEET HISTORY */}
         <div className="panel-container scrollable-panel" style={{ flex: 1, overflowX: 'auto' }}>
-          <h3 className="panel-header" style={{ background: '#34495e', color: '#fff', padding: '4px', margin: 0, fontSize: '12px' }}>
+          <h3 className="panel-header" style={{ background: '#34495e', color: '#fff', padding: '4px', margin: 0, fontSize: '13px' }}>
             FULL SHEET HISTORY
           </h3>
-          <table className="matka-pdf-table" onMouseUp={handleMouseUp} style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
+          <table className="matka-pdf-table" onMouseUp={handleMouseUp} style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
             <thead>
               <tr>
-                {DAYS.map((day) => <th key={day} style={{ padding: '2px 4px', fontSize: '10px' }}>{day}</th>)}
+                {DAYS.map((day, idx) => (
+                  <th key={day} style={{ width: idx === 0 ? '70px' : 'auto', padding: '3px 1px', fontSize: '11px' }}>{day}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
@@ -311,7 +313,7 @@ const App: React.FC = () => {
                 <tr key={`full-row-${rIdx}`}>
                   {week.map((rawVal, cIdx) => {
                     if (cIdx === 0) {
-                      return <td key={`full-date-${rIdx}`} className="pdf-date-cell" style={{ padding: '2px', fontSize: '9px', whiteSpace: 'nowrap' }}>{formatDateString(rawVal)}</td>;
+                      return <td key={`full-date-${rIdx}`} className="pdf-date-cell" style={{ padding: '2px 1px', fontSize: '10px', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{formatDateString(rawVal)}</td>;
                     }
 
                     const formattedVal = formatJodiVal(rawVal);
@@ -328,7 +330,6 @@ const App: React.FC = () => {
                       const maxSelRow = selectedCells.length > 0 ? Math.max(...selectedCells.map(c => c.rowIndex)) : 0;
                       const matchEnd = matchStart + (maxSelRow - selectedMinRow);
 
-                      // Check inside selection area
                       if (rIdx >= selectedMinRow && rIdx <= maxSelRow) {
                         const offsetRow = rIdx - selectedMinRow;
                         const targetHistJodi = formatJodiVal(fullSheetData[matchStart + offsetRow]?.[cIdx] || "");
@@ -344,7 +345,6 @@ const App: React.FC = () => {
                         if (selMetrics.totalNum !== null && selMetrics.totalNum === matchMetrics.totalNum) isTotalMatch = true;
                       }
 
-                      // Check inside matched historical area
                       if (rIdx >= matchStart && rIdx <= matchEnd) {
                         const offsetRow = rIdx - matchStart;
                         const matchingSelectedCell = selectedCells.find((c) => (c.rowIndex - selectedMinRow) === offsetRow && c.colIndex === cIdx);
@@ -381,19 +381,21 @@ const App: React.FC = () => {
                         className="pdf-jodi-cell"
                         style={{ 
                           backgroundColor: cellBg, 
-                          border: isExactJodiMatch ? '2px solid #b71c1c' : isHighlightCell ? '2px solid #27ae60' : '1px solid #ddd',
-                          fontWeight: isHighlightCell ? 'bold' : 'normal',
-                          padding: '2px',
+                          border: isExactJodiMatch ? '2px solid #b71c1c' : isHighlightCell ? '2px solid #27ae60' : '1px solid #ccc',
+                          fontWeight: 'bold',
+                          padding: '2px 0px',
                           cursor: 'pointer' 
                         }}
                         onMouseDown={() => handleMouseDown(rIdx, cIdx, formattedVal)}
                         onMouseEnter={() => handleMouseEnter(rIdx, cIdx)}
                       >
-                        <div className={`jodi-val ${isRed ? 'red-text' : ''}`} style={{ fontSize: '11px', textAlign: 'center' }}>
+                        {/* JODI NUMBER SIZE IS KEPT LARGE (14px) */}
+                        <div className={`jodi-val ${isRed ? 'red-text' : ''}`} style={{ fontSize: '14px', fontWeight: 'bold', textAlign: 'center', lineHeight: '1.1' }}>
                           {formattedVal || '**'}
-                          {isExactJodiMatch && <span style={{ color: '#b71c1c', fontSize: '9px', marginLeft: '1px' }}>★</span>}
+                          {isExactJodiMatch && <span style={{ color: '#b71c1c', fontSize: '10px', marginLeft: '1px' }}>★</span>}
                         </div>
-                        <div className="metrics-row" style={{ fontSize: '8px', display: 'flex', justifyContent: 'space-between', marginTop: '1px' }}>
+                        {/* COMPACT METRICS ROW BELOW */}
+                        <div className="metrics-row" style={{ fontSize: '9px', display: 'flex', justifyContent: 'space-between', padding: '0 2px', marginTop: '1px' }}>
                           <span className="diff-val" style={{ color: '#8b0000', fontWeight: 'bold', backgroundColor: isDiffMatch ? '#fff59d' : 'transparent', padding: '0 1px', borderRadius: '2px' }}>
                             {diff || ''}
                           </span>
@@ -414,13 +416,15 @@ const App: React.FC = () => {
         <div className="matches-wrapper" style={{ flex: 1, overflowX: 'auto' }}>
           {currentMatch ? (
             <div className="panel-container">
-              <h3 className="panel-header" style={{ background: '#27ae60', color: '#fff', padding: '4px', margin: 0, fontSize: '12px' }}>
+              <h3 className="panel-header" style={{ background: '#27ae60', color: '#fff', padding: '4px', margin: 0, fontSize: '13px' }}>
                 MATCHED SET {currentMatchIndex + 1} OF {matchedSets.length} ({currentMatch.matchCount} MATCHED) - DATE: {currentMatch.startDate}
               </h3>
-              <table className="matka-pdf-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
+              <table className="matka-pdf-table" style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
                 <thead>
                   <tr>
-                    {DAYS.map((day) => <th key={day} style={{ padding: '2px 4px', fontSize: '10px' }}>{day}</th>)}
+                    {DAYS.map((day, idx) => (
+                      <th key={day} style={{ width: idx === 0 ? '70px' : 'auto', padding: '3px 1px', fontSize: '11px' }}>{day}</th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
@@ -428,7 +432,7 @@ const App: React.FC = () => {
                     <tr key={`match-row-${rIdx}`}>
                       {week.map((rawVal, cIdx) => {
                         if (cIdx === 0) {
-                          return <td key={`match-date-${rIdx}`} className="pdf-date-cell" style={{ padding: '2px', fontSize: '9px', whiteSpace: 'nowrap' }}>{formatDateString(rawVal)}</td>;
+                          return <td key={`match-date-${rIdx}`} className="pdf-date-cell" style={{ padding: '2px 1px', fontSize: '10px', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{formatDateString(rawVal)}</td>;
                         }
 
                         const formattedVal = formatJodiVal(rawVal);
@@ -466,16 +470,18 @@ const App: React.FC = () => {
                             className="pdf-jodi-cell"
                             style={{ 
                               backgroundColor: cellBg, 
-                              border: isExactJodiMatch ? '2px solid #b71c1c' : isMatch ? '2px solid #27ae60' : '1px solid #ddd',
-                              fontWeight: isMatch ? 'bold' : 'normal',
-                              padding: '2px'
+                              border: isExactJodiMatch ? '2px solid #b71c1c' : isMatch ? '2px solid #27ae60' : '1px solid #ccc',
+                              fontWeight: 'bold',
+                              padding: '2px 0px'
                             }}
                           >
-                            <div className={`jodi-val ${isRed ? 'red-text' : ''}`} style={{ fontSize: '11px', textAlign: 'center' }}>
+                            {/* JODI NUMBER SIZE IS KEPT LARGE (14px) */}
+                            <div className={`jodi-val ${isRed ? 'red-text' : ''}`} style={{ fontSize: '14px', fontWeight: 'bold', textAlign: 'center', lineHeight: '1.1' }}>
                               {formattedVal || '**'}
-                              {isExactJodiMatch && <span style={{ color: '#b71c1c', fontSize: '9px', marginLeft: '1px' }}>★</span>}
+                              {isExactJodiMatch && <span style={{ color: '#b71c1c', fontSize: '10px', marginLeft: '1px' }}>★</span>}
                             </div>
-                            <div className="metrics-row" style={{ fontSize: '8px', display: 'flex', justifyContent: 'space-between', marginTop: '1px' }}>
+                            {/* COMPACT METRICS ROW BELOW */}
+                            <div className="metrics-row" style={{ fontSize: '9px', display: 'flex', justifyContent: 'space-between', padding: '0 2px', marginTop: '1px' }}>
                               <span className="diff-val" style={{ color: '#8b0000', fontWeight: 'bold', backgroundColor: isDiffMatch ? '#fff59d' : 'transparent', padding: '0 1px', borderRadius: '2px' }}>
                                 {diff || ''}
                               </span>
@@ -494,7 +500,7 @@ const App: React.FC = () => {
           ) : (
             <div className="panel-container placeholder-panel" style={{ padding: '20px', textAlign: 'center', background: '#f9f9f9', border: '1px dashed #ccc' }}>
               <h3 className="panel-header" style={{ color: '#777', fontSize: '13px' }}>MATCHED HISTORY RESULTS</h3>
-              <p className="placeholder-text" style={{ color: '#666', fontSize: '11px' }}>
+              <p className="placeholder-text" style={{ color: '#666', fontSize: '12px' }}>
                 डाव्या बाजूच्या Sheet वर १ ते २० आठवडे drag करून सिलेक्ट करा आणि **Find Pattern** बटणावर क्लिक करा.
               </p>
             </div>
