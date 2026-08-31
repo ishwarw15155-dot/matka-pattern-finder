@@ -63,9 +63,8 @@ const getJodiMetrics = (jodiStr: string): JodiMetrics => {
   return { jodi: jodiStr, totalStr: `T-${total}`, diffStr: `D-${diff}`, total, diff };
 };
 
-// --- APP COMPONENT ---
+// --- MAIN APP COMPONENT ---
 const DAYS: string[] = ["MON", "TUE", "WED", "THU", "FRI", "SAT"];
-
 const GOOGLE_SHEET_API_URL: string = "https://script.google.com/macros/s/AKfycbxl1Qq4yqrRuvYC_H3ZsMDXyUGZw245Ws3kWm8l075Osb0WyZktd6QJosOe_jdgHECd/exec";
 
 interface SelectedCell {
@@ -85,17 +84,20 @@ const App: React.FC = () => {
   useEffect(() => {
     const fetchData = async (): Promise<void> => {
       try {
-        if (!GOOGLE_SHEET_API_URL || GOOGLE_SHEET_API_URL.includes("YOUR_GOOGLE_APPS_SCRIPT")) {
-          console.warn("Google Sheet API URL is not set.");
-          setLoading(false);
-          return;
-        }
+        const response = await fetch(GOOGLE_SHEET_API_URL, {
+          method: 'GET',
+          redirect: 'follow',
+          headers: {
+            'Content-Type': 'text/plain;charset=utf-8',
+          },
+        });
 
-        const response = await fetch(GOOGLE_SHEET_API_URL);
         const rawData: unknown = await response.json();
 
         if (Array.isArray(rawData) && rawData.length > 0) {
-          const formattedData = rawData as string[][];
+          const formattedData = (rawData as (string | number)[][]).map((row) =>
+            row.map((cell) => String(cell))
+          );
           setFullSheetData(formattedData);
           setCurrentGrid(formattedData.slice(-20));
         }
