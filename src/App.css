@@ -7,7 +7,6 @@
 body {
   font-family: Arial, sans-serif;
   background-color: #f4f6f8;
-  color: #000;
   padding: 10px;
 }
 
@@ -16,14 +15,10 @@ body {
   margin: 0 auto;
 }
 
-.app-header {
-  text-align: center;
-  margin-bottom: 12px;
-}
-
 .app-header h2 {
-  font-size: 20px;
-  font-weight: bold;
+  text-align: center;
+  font-size: 18px;
+  margin-bottom: 10px;
 }
 
 .side-by-side-container {
@@ -35,80 +30,77 @@ body {
 
 .panel-container {
   background: #ffffff;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  padding: 8px;
+  border: 1px solid #000;
+  padding: 4px;
   flex: 1;
   min-width: 340px;
 }
 
 .panel-header {
   text-align: center;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: bold;
   background-color: #f0f0f0;
   padding: 4px 0;
-  margin-bottom: 6px;
-  border-radius: 2px;
+  margin-bottom: 4px;
+  border: 1px solid #000;
 }
 
-.placeholder-panel {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  min-height: 250px;
-}
-
-.placeholder-text {
-  font-size: 12px;
-  color: #666;
-  margin-top: 20px;
-}
-
-/* TABLE STYLING - EXACT SHEET LOOK */
-.matka-sheet-table {
+/* TABLE STYLING */
+.matka-pdf-table {
   width: 100%;
   border-collapse: collapse;
   background-color: #fff;
   user-select: none;
 }
 
-.matka-sheet-table th,
-.matka-sheet-table td {
-  border: 1.5px solid #000;
-  text-align: center;
-  vertical-align: middle;
-  padding: 3px 2px;
-  height: 26px;
-}
-
-.matka-sheet-table th {
+.matka-pdf-table th {
+  border: 1px solid #000;
   font-size: 12px;
   font-weight: bold;
-  background-color: #ffffff;
+  padding: 4px;
+  text-align: center;
 }
 
-.sheet-date-cell {
-  font-size: 11px;
-  font-weight: 500;
-  color: #000;
-  white-space: nowrap;
-}
-
-.sheet-jodi-cell {
-  font-size: 16px;
-  font-weight: bold;
-  color: #000;
+.pdf-jodi-cell {
+  border: 1px solid #000;
+  text-align: center;
+  padding: 4px 2px;
+  height: 48px;
+  vertical-align: middle;
   cursor: pointer;
 }
 
-/* RED JODI COLORING */
-.red-jodi {
+.jodi-val {
+  font-size: 16px;
+  font-weight: bold;
+  color: #000;
+  line-height: 1.1;
+}
+
+.red-text {
   color: #d32f2f !important;
 }
 
-/* SELECTION AND MATCH HIGHLIGHTS */
+/* METRICS INSIDE CELL */
+.metrics-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 4px;
+  margin-top: 2px;
+  font-size: 10px;
+  font-weight: bold;
+}
+
+.diff-val {
+  color: #a52a2a; /* Brown */
+}
+
+.total-val {
+  color: #2e7d32; /* Green */
+}
+
+/* HIGHLIGHTS */
 .cell-selected {
   background-color: #bbdefb !important;
 }
