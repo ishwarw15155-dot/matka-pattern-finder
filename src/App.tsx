@@ -37,6 +37,8 @@ const checkSameFamily = (jodi1: string, jodi2: string): boolean => {
   return false;
 };
 
+// --- CORRECT DIFFERENCE & TOTAL CALCULATION ---
+// Difference = Open - Close (If negative, add 10)
 const calculateMetrics = (jodiStr: string) => {
   if (!jodiStr || jodiStr.length < 2 || jodiStr.includes('*') || jodiStr.includes('✪')) {
     return { diff: null, total: null };
@@ -47,6 +49,7 @@ const calculateMetrics = (jodiStr: string) => {
 
   let diff = open - close;
   if (diff < 0) diff += 10;
+  
   const total = (open + close) % 10;
 
   return { diff: `D-${diff}`, total: `T-${total}` };
@@ -70,7 +73,6 @@ interface SelectedCell {
 const App: React.FC = () => {
   const [fullSheetData, setFullSheetData] = useState<string[][]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [currentGrid, setCurrentGrid] = useState<string[][]>([]);
   const [matchedSets, setMatchedSets] = useState<string[][][]>([]);
   const [isSelecting, setIsSelecting] = useState<boolean>(false);
   const [selectedCells, setSelectedCells] = useState<SelectedCell[]>([]);
@@ -94,7 +96,6 @@ const App: React.FC = () => {
           );
 
           setFullSheetData(cleanData);
-          setCurrentGrid(cleanData.length > 20 ? cleanData.slice(-20) : cleanData);
         }
         setLoading(false);
       } catch (error) {
@@ -117,7 +118,12 @@ const App: React.FC = () => {
         (cell) => cell.rowIndex === rIdx && cell.colIndex === cIdx
       );
       if (!exists) {
-        setSelectedCells((prev) => [...prev, { rowIndex: rIdx, colIndex: cIdx, value }]);
+        // Enforce max selection limit of 20 weeks height
+        const minRow = Math.min(...selectedCells.map((c) => c.rowIndex), rIdx);
+        const maxRow = Math.max(...selectedCells.map((c) => c.rowIndex), rIdx);
+        if (maxRow - minRow + 1 <= 20) {
+          setSelectedCells((prev) => [...prev, { rowIndex: rIdx, colIndex: cIdx, value }]);
+        }
       }
     }
   };
@@ -137,14 +143,13 @@ const App: React.FC = () => {
     const numRows = maxRow - minRow + 1;
 
     const matches: string[][][] = [];
-    const historicalData = fullSheetData.slice(0, Math.max(0, fullSheetData.length - 20));
 
-    for (let i = 0; i <= historicalData.length - numRows; i++) {
+    for (let i = 0; i <= fullSheetData.length - numRows; i++) {
       let isMatch = true;
 
       for (const cell of selectedCells) {
         const offsetRow = cell.rowIndex - minRow;
-        const targetHistJodi = formatJodiVal(historicalData[i + offsetRow]?.[cell.colIndex + 1] || "");
+        const targetHistJodi = formatJodiVal(fullSheetData[i + offsetRow]?.[cell.colIndex + 1] || "");
 
         const isFamMatch = checkSameFamily(cell.value, targetHistJodi);
         if (!isFamMatch && cell.value !== targetHistJodi) {
@@ -154,7 +159,7 @@ const App: React.FC = () => {
       }
 
       if (isMatch) {
-        const matchBlock = historicalData.slice(i, i + numRows);
+        const matchBlock = fullSheetData.slice(i, i + numRows);
         matches.push(matchBlock);
       }
     }
@@ -163,7 +168,7 @@ const App: React.FC = () => {
   };
 
   const renderTable = (gridData: string[][], title: string, isCurrentSet: boolean) => (
-    <div className="panel-container">
+    <div className={`panel-container ${isCurrentSet ? 'scrollable-panel' : ''}`}>
       <h3 className="panel-header">{title}</h3>
       <table className="matka-pdf-table" onMouseUp={handleMouseUp}>
         <thead>
@@ -175,7 +180,6 @@ const App: React.FC = () => {
         </thead>
         <tbody>
           {gridData.map((week, rIdx) => {
-            // Exclude column 0 (Date) for day grid matching
             const dayCells = week.slice(1, 7);
 
             return (
@@ -186,17 +190,11 @@ const App: React.FC = () => {
                     (cell) => cell.rowIndex === rIdx && cell.colIndex === cIdx
                   );
 
-                  const currentSelectedJodi = formatJodiVal(currentGrid[rIdx]?.[cIdx + 1] || "");
-                  const isFamilyMatch = checkSameFamily(formattedVal, currentSelectedJodi);
-                  const isExactMatch = formattedVal === currentSelectedJodi && formattedVal !== "" && !formattedVal.includes('*');
                   const isRed = isRedJodi(formattedVal);
-
                   const { diff, total } = calculateMetrics(formattedVal);
 
                   let cellClass = "pdf-jodi-cell";
                   if (isSelected) cellClass += " cell-selected";
-                  if (!isCurrentSet && isExactMatch) cellClass += " exact-family-match";
-                  else if (!isCurrentSet && isFamilyMatch) cellClass += " group-family-match";
 
                   return (
                     <td
@@ -234,20 +232,22 @@ const App: React.FC = () => {
       </header>
 
       <div className="side-by-side-container">
-        {renderTable(currentGrid, "CURRENT SELECTED SET", true)}
+        {renderTable(fullSheetData, "FULL SHEET (DRAG TO SELECT UP TO 20 WEEKS)", true)}
 
-        {matchedSets.length > 0 ? (
-          matchedSets.map((matchBlock, idx) => (
-            <React.Fragment key={`match-${idx}`}>
-              {renderTable(matchBlock, `FOUND MATCH HISTORY SET ${idx + 1}`, false)}
-            </React.Fragment>
-          ))
-        ) : (
-          <div className="panel-container placeholder-panel">
-            <h3 className="panel-header">FOUND MATCH HISTORY SET 1</h3>
-            <p className="placeholder-text">Select cells on the left grid to run similarity search.</p>
-          </div>
-        )}
+        <div className="matches-wrapper">
+          {matchedSets.length > 0 ? (
+            matchedSets.map((matchBlock, idx) => (
+              <React.Fragment key={`match-${idx}`}>
+                {renderTable(matchBlock, `FOUND MATCH HISTORY SET ${idx + 1}`, false)}
+              </React.Fragment>
+            ))
+          ) : (
+            <div className="panel-container placeholder-panel">
+              <h3 className="panel-header">FOUND MATCH HISTORY SET 1</h3>
+              <p className="placeholder-text">Select cells on the left grid to run similarity search.</p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
