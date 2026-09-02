@@ -192,7 +192,7 @@ const App: React.FC = () => {
 
     const minRow = Math.min(dragStartCell.rowIndex, rIdx);
     const maxRow = Math.max(dragStartCell.rowIndex, rIdx);
-    if (maxRow - minRow + 1 > 20) return;
+    if (maxRow - minRow + 1 > 30) return;
 
     const minCol = Math.min(dragStartCell.colIndex, cIdx);
     const maxCol = Math.max(dragStartCell.colIndex, cIdx);
