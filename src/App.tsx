@@ -20,7 +20,7 @@ const JODI_FAMILIES: Record<string, { members: string[]; color: string }> = {
   "49": { members: ["49", "94", "44", "99"], color: "#FFFDE7" }
 };
 
-const CUSTOM_HIGHLIGHT_COLOR = "#00e676"; 
+const CUSTOM_HIGHLIGHT_COLOR = "#00e676";
 
 const getFamilyColor = (jodiStr: string): string => {
   if (!jodiStr || jodiStr.length < 2 || jodiStr.includes('*') || jodiStr.includes('✪')) return '#ffffff';
@@ -128,7 +128,6 @@ const App: React.FC = () => {
   const leftPanelRef = useRef<HTMLDivElement | null>(null);
   const lastRowRef = useRef<HTMLTableRowElement | null>(null);
 
-  // --- UPDATED FETCH LOGIC TO FIX SHEET NOT LOADING ISSUE ---
   useEffect(() => {
     const fetchData = async (): Promise<void> => {
       try {
@@ -141,12 +140,8 @@ const App: React.FC = () => {
             row.map((cell) => (cell !== null && cell !== undefined ? String(cell).trim() : ""))
           );
 
-          // Remove completely empty rows
           const cleanData = formattedData.filter((row) => row.some((c) => c !== ""));
-
           setFullSheetData(cleanData);
-        } else {
-          console.error("No data received from Sheet API");
         }
       } catch (error) {
         console.error("Error fetching Google Sheet data:", error);
@@ -185,7 +180,7 @@ const App: React.FC = () => {
   const handleStartSelection = (rIdx: number, cIdx: number, value: string): void => {
     if (cIdx === 0) return;
     setIsSelecting(true);
-    const startCell = { rowIndex: rIdx, colIndex: cIdx, value };
+    const startCell = { rowIndex: rIdx, colIndex: cIdx, value: formatJodiVal(value) };
     setDragStartCell(startCell);
     setSelectedCells([startCell]);
     setManualHighlightedFamily([]);
@@ -261,15 +256,22 @@ const App: React.FC = () => {
         const offsetRow = cell.rowIndex - minRow;
         const targetHistJodi = formatJodiVal(fullSheetData[i + offsetRow]?.[cell.colIndex] || "");
 
+        if (!cell.value || cell.value.includes('*') || cell.value.includes('✪')) continue;
+
         if (strictMode) {
-          if (cell.value === targetHistJodi) matchCount++;
+          // STRICT SEARCH: strictly exact match is counted for pattern finding
+          if (cell.value === targetHistJodi) {
+            matchCount++;
+          }
         } else {
+          // NORMAL SEARCH: family or exact match is counted
           if (checkSameFamily(cell.value, targetHistJodi) || cell.value === targetHistJodi) {
             matchCount++;
           }
         }
       }
 
+      // Check repeat positions for highlights
       for (const pair of selRepeatPairs) {
         const off1 = pair.cell1.rowIndex - minRow;
         const off2 = pair.cell2.rowIndex - minRow;
@@ -277,7 +279,7 @@ const App: React.FC = () => {
         const targetJodi2 = formatJodiVal(fullSheetData[i + off2]?.[pair.cell2.colIndex] || "");
 
         if (targetJodi1 && targetJodi2 && (targetJodi1 === targetJodi2 || checkSameFamily(targetJodi1, targetJodi2))) {
-          matchCount++;
+          if (!strictMode) matchCount++;
           const posKey1 = `${off1}_${pair.cell1.colIndex}`;
           const posKey2 = `${off2}_${pair.cell2.colIndex}`;
           if (!repeatPositions.includes(posKey1)) repeatPositions.push(posKey1);
@@ -476,7 +478,6 @@ const App: React.FC = () => {
                       const isSelected = selectedCells.some((cell) => cell.rowIndex === rIdx && cell.colIndex === cIdx);
 
                       let isMatchedInOriginal = false;
-                      let isMatchedInHistory = false;
                       let isExactJodiMatch = false;
                       let isDiffMatch = false;
                       let isTotalMatch = false;
@@ -485,7 +486,6 @@ const App: React.FC = () => {
                       if (currentMatch) {
                         const matchStart = currentMatch.startRowIndex;
                         const maxSelRow = selectedCells.length > 0 ? Math.max(...selectedCells.map(c => c.rowIndex)) : 0;
-                        const matchEnd = matchStart + (maxSelRow - selectedMinRow);
 
                         if (rIdx >= selectedMinRow && rIdx <= maxSelRow) {
                           const offsetRow = rIdx - selectedMinRow;
@@ -503,24 +503,6 @@ const App: React.FC = () => {
                           if (selMetrics.diffNum !== null && selMetrics.diffNum === matchMetrics.diffNum) isDiffMatch = true;
                           if (selMetrics.totalNum !== null && selMetrics.totalNum === matchMetrics.totalNum) isTotalMatch = true;
                         }
-
-                        if (rIdx >= matchStart && rIdx <= matchEnd) {
-                          const offsetRow = rIdx - matchStart;
-                          const posKey = `${offsetRow}_${cIdx}`;
-                          const matchingSelectedCell = selectedCells.find((c) => (c.rowIndex - selectedMinRow) === offsetRow && c.colIndex === cIdx);
-                          if (matchingSelectedCell) {
-                            if (checkSameFamily(matchingSelectedCell.value, formattedVal) || matchingSelectedCell.value === formattedVal) {
-                              isMatchedInHistory = true;
-                            }
-                            if (matchingSelectedCell.value === formattedVal) isExactJodiMatch = true;
-                            if (currentMatch.repeatPositions.includes(posKey)) isRepeatMatch = true;
-
-                            const selMetrics = calculateMetrics(matchingSelectedCell.value);
-                            const histMetrics = calculateMetrics(formattedVal);
-                            if (selMetrics.diffNum !== null && selMetrics.diffNum === histMetrics.diffNum) isDiffMatch = true;
-                            if (selMetrics.totalNum !== null && selMetrics.totalNum === histMetrics.totalNum) isTotalMatch = true;
-                          }
-                        }
                       }
 
                       const famColor = getFamilyColor(formattedVal);
@@ -534,11 +516,11 @@ const App: React.FC = () => {
                         cellBg = CUSTOM_HIGHLIGHT_COLOR; 
                       } else if (matchedSets.length === 0 && isSelected) {
                         cellBg = '#a0c4ff'; 
-                      } else if (isMatchedInOriginal || isMatchedInHistory || isRepeatMatch) {
+                      } else if (isMatchedInOriginal || isRepeatMatch) {
                         cellBg = famColor;
                       }
 
-                      const isHighlightCell = isMatchedInOriginal || isMatchedInHistory || isRepeatMatch || isManualHighlight;
+                      const isHighlightCell = isMatchedInOriginal || isRepeatMatch || isManualHighlight;
 
                       return (
                         <td
