@@ -103,6 +103,7 @@ interface MatchResult {
   startRowIndex: number;
   matchCount: number;
   matchedPatternLength: number;
+  pastRowsCount: number;
   repeatPositions: string[];
 }
 
@@ -231,6 +232,8 @@ const App: React.FC = () => {
     const minRow = Math.min(...selectedCells.map((c) => c.rowIndex));
     const maxRow = Math.max(...selectedCells.map((c) => c.rowIndex));
     const numRows = maxRow - minRow + 1;
+    
+    const PAST_ROWS = 10;
     const FUTURE_ROWS = 10;
 
     const selRepeatPairs: { cell1: CellPosition; cell2: CellPosition }[] = [];
@@ -259,19 +262,16 @@ const App: React.FC = () => {
         if (!cell.value || cell.value.includes('*') || cell.value.includes('✪')) continue;
 
         if (strictMode) {
-          // STRICT SEARCH: strictly exact match is counted for pattern finding
           if (cell.value === targetHistJodi) {
             matchCount++;
           }
         } else {
-          // NORMAL SEARCH: family or exact match is counted
           if (checkSameFamily(cell.value, targetHistJodi) || cell.value === targetHistJodi) {
             matchCount++;
           }
         }
       }
 
-      // Check repeat positions for highlights
       for (const pair of selRepeatPairs) {
         const off1 = pair.cell1.rowIndex - minRow;
         const off2 = pair.cell2.rowIndex - minRow;
@@ -288,9 +288,13 @@ const App: React.FC = () => {
       }
 
       if (matchCount >= minMatchCount) {
-        const totalRowsToFetch = numRows + FUTURE_ROWS;
-        const matchBlock = fullSheetData.slice(i, i + totalRowsToFetch);
-        const startDate = formatDateString(matchBlock[0]?.[0] || "");
+        const blockStart = Math.max(0, i - PAST_ROWS);
+        const blockEnd = Math.min(fullSheetData.length, i + numRows + FUTURE_ROWS);
+        
+        const matchBlock = fullSheetData.slice(blockStart, blockEnd);
+        const startDate = formatDateString(fullSheetData[i]?.[0] || "");
+
+        const actualPastCount = i - blockStart;
 
         matches.push({ 
           matchBlock, 
@@ -298,6 +302,7 @@ const App: React.FC = () => {
           startRowIndex: i, 
           matchCount,
           matchedPatternLength: numRows,
+          pastRowsCount: actualPastCount,
           repeatPositions
         });
       }
@@ -566,7 +571,7 @@ const App: React.FC = () => {
           </table>
         </div>
 
-        {/* RIGHT PANEL: MATCHED RESULT */}
+        {/* RIGHT PANEL: MATCHED RESULT WITH PAST & FUTURE ROWS */}
         <div className="matches-wrapper" style={{ flex: 1, overflowX: 'auto', maxHeight: '80vh', overflowY: 'auto' }}>
           {currentMatch ? (
             <div className="panel-container">
@@ -582,19 +587,28 @@ const App: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {currentMatch.matchBlock.map((week, rIdx) => {
-                    const isFutureRow = rIdx >= currentMatch.matchedPatternLength;
+                  {currentMatch.matchBlock.map((week, blockIdx) => {
+                    const pastCount = currentMatch.pastRowsCount;
+                    const patternLen = currentMatch.matchedPatternLength;
+
+                    const isPastRow = blockIdx < pastCount;
+                    const isPatternRow = blockIdx >= pastCount && blockIdx < pastCount + patternLen;
+                    const isFutureRow = blockIdx >= pastCount + patternLen;
+
+                    const patternRowIndex = blockIdx - pastCount;
 
                     return (
                       <tr 
-                        key={`match-row-${rIdx}`}
-                        style={{ backgroundColor: isFutureRow ? '#fcf8e3' : 'transparent' }}
+                        key={`match-row-${blockIdx}`}
+                        style={{ 
+                          backgroundColor: isPastRow ? '#eef7ff' : isFutureRow ? '#fcf8e3' : 'transparent' 
+                        }}
                       >
                         {week.map((rawVal, cIdx) => {
                           if (cIdx === 0) {
                             return (
                               <td 
-                                key={`match-date-${rIdx}`} 
+                                key={`match-date-${blockIdx}`} 
                                 className="pdf-date-cell" 
                                 style={{ 
                                   padding: '2px 1px', 
@@ -602,18 +616,22 @@ const App: React.FC = () => {
                                   whiteSpace: 'nowrap', 
                                   textOverflow: 'ellipsis', 
                                   overflow: 'hidden',
-                                  fontWeight: isFutureRow ? 'bold' : 'normal',
-                                  color: isFutureRow ? '#d35400' : 'inherit'
+                                  fontWeight: (!isPatternRow) ? 'bold' : 'normal',
+                                  color: isPastRow ? '#2980b9' : isFutureRow ? '#d35400' : 'inherit'
                                 }}
                               >
-                                {formatDateString(rawVal)} {isFutureRow && rIdx === currentMatch.matchedPatternLength && "⬇"}
+                                {formatDateString(rawVal)} 
+                                {isPastRow && blockIdx === pastCount - 1 && " ⬆"}
+                                {isFutureRow && blockIdx === pastCount + patternLen && " ⬇"}
                               </td>
                             );
                           }
 
                           const formattedVal = formatJodiVal(rawVal);
-                          const targetSelectedCell = selectedCells.find((c) => (c.rowIndex - selectedMinRow) === rIdx && c.colIndex === cIdx);
-                          const posKey = `${rIdx}_${cIdx}`;
+                          const targetSelectedCell = isPatternRow 
+                            ? selectedCells.find((c) => (c.rowIndex - selectedMinRow) === patternRowIndex && c.colIndex === cIdx)
+                            : null;
+                          const posKey = `${patternRowIndex}_${cIdx}`;
 
                           let isMatch = false;
                           let isExactJodiMatch = false;
@@ -621,7 +639,7 @@ const App: React.FC = () => {
                           let isTotalMatch = false;
                           let isRepeatMatch = false;
 
-                          if (!isFutureRow) {
+                          if (isPatternRow) {
                             if (currentMatch.repeatPositions.includes(posKey)) {
                               isRepeatMatch = true;
                             }
@@ -657,7 +675,7 @@ const App: React.FC = () => {
 
                           return (
                             <td
-                              key={`match-cell-${rIdx}-${cIdx}`}
+                              key={`match-cell-${blockIdx}-${cIdx}`}
                               className="pdf-jodi-cell"
                               style={{ 
                                 backgroundColor: cellBg, 
