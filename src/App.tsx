@@ -165,7 +165,7 @@ const App: React.FC = () => {
   const handleLoginSubmit = (e: React.FormEvent): void => {
     e.preventDefault();
     // Default Passcode: 1234
-    if (loginPin === '1234') {
+    if (loginPin === '5666') {
       setIsLoggedIn(true);
       setLoginError('');
     } else {
@@ -324,7 +324,10 @@ const App: React.FC = () => {
               <option value={1}>1+</option>
               <option value={2}>2+</option>
               <option value={3}>3+</option>
+              <option value={4}>4+</option>
               <option value={5}>5+</option>
+              <option value={6}>6+</option>
+              <option value={7}>7+</option>
             </select>
           </label>
 
