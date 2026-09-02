@@ -20,7 +20,7 @@ const JODI_FAMILIES: Record<string, { members: string[]; color: string }> = {
   "49": { members: ["49", "94", "44", "99"], color: "#FFFDE7" }
 };
 
-const CUSTOM_HIGHLIGHT_COLOR = "#00e676"; // स्वतंत्र मॅन्युअल क्लिक हायलाइट रंग (Bright Neon Green)
+const CUSTOM_HIGHLIGHT_COLOR = "#00e676"; 
 
 const getFamilyColor = (jodiStr: string): string => {
   if (!jodiStr || jodiStr.length < 2 || jodiStr.includes('*') || jodiStr.includes('✪')) return '#ffffff';
@@ -71,7 +71,7 @@ const calculateMetrics = (jodiStr: string) => {
 
 const formatJodiVal = (val: string): string => {
   if (!val) return '';
-  const trimmed = val.trim();
+  const trimmed = String(val).trim();
   return /^\d$/.test(trimmed) ? `0${trimmed}` : trimmed;
 };
 
@@ -103,7 +103,7 @@ interface MatchResult {
   startRowIndex: number;
   matchCount: number;
   matchedPatternLength: number;
-  repeatPositions: string[]; // Stores repeated pattern keys e.g. "relR1-c2:relR2-c2"
+  repeatPositions: string[];
 }
 
 const App: React.FC = () => {
@@ -123,19 +123,17 @@ const App: React.FC = () => {
   const [minMatchCount, setMinMatchCount] = useState<number>(2);
   const [strictMode, setStrictMode] = useState<boolean>(false);
 
-  // Manual Jodi Click Highlight State
   const [manualHighlightedFamily, setManualHighlightedFamily] = useState<string[]>([]);
 
   const leftPanelRef = useRef<HTMLDivElement | null>(null);
   const lastRowRef = useRef<HTMLTableRowElement | null>(null);
 
+  // --- UPDATED FETCH LOGIC TO FIX SHEET NOT LOADING ISSUE ---
   useEffect(() => {
     const fetchData = async (): Promise<void> => {
       try {
-        const response = await fetch(GOOGLE_SHEET_API_URL, {
-          method: 'GET',
-          redirect: 'follow',
-        });
+        setLoading(true);
+        const response = await fetch(GOOGLE_SHEET_API_URL);
         const rawData: unknown = await response.json();
 
         if (Array.isArray(rawData) && rawData.length > 0) {
@@ -143,15 +141,16 @@ const App: React.FC = () => {
             row.map((cell) => (cell !== null && cell !== undefined ? String(cell).trim() : ""))
           );
 
-          const cleanData = formattedData.filter(
-            (row) => row.some(c => c !== "") && !String(row[0]).toUpperCase().includes("DATE")
-          );
+          // Remove completely empty rows
+          const cleanData = formattedData.filter((row) => row.some((c) => c !== ""));
 
           setFullSheetData(cleanData);
+        } else {
+          console.error("No data received from Sheet API");
         }
-        setLoading(false);
       } catch (error) {
         console.error("Error fetching Google Sheet data:", error);
+      } finally {
         setLoading(false);
       }
     };
@@ -189,7 +188,7 @@ const App: React.FC = () => {
     const startCell = { rowIndex: rIdx, colIndex: cIdx, value };
     setDragStartCell(startCell);
     setSelectedCells([startCell]);
-    setManualHighlightedFamily([]); // Reset manual highlights on new selection
+    setManualHighlightedFamily([]);
   };
 
   const handleMoveSelection = (rIdx: number, cIdx: number): void => {
@@ -231,7 +230,6 @@ const App: React.FC = () => {
     }
   };
 
-  // --- PATTERN SEARCH LOGIC WITH REPETITION DETECTION ---
   const runPatternSearch = (): void => {
     if (selectedCells.length === 0 || fullSheetData.length === 0) return;
 
@@ -240,7 +238,6 @@ const App: React.FC = () => {
     const numRows = maxRow - minRow + 1;
     const FUTURE_ROWS = 10;
 
-    // Detect repeat pattern pairs in original selection
     const selRepeatPairs: { cell1: CellPosition; cell2: CellPosition }[] = [];
     for (let i = 0; i < selectedCells.length; i++) {
       for (let j = i + 1; j < selectedCells.length; j++) {
@@ -273,14 +270,12 @@ const App: React.FC = () => {
         }
       }
 
-      // Check if candidate history block repeats at the exact same relative positions
       for (const pair of selRepeatPairs) {
         const off1 = pair.cell1.rowIndex - minRow;
         const off2 = pair.cell2.rowIndex - minRow;
         const targetJodi1 = formatJodiVal(fullSheetData[i + off1]?.[pair.cell1.colIndex] || "");
         const targetJodi2 = formatJodiVal(fullSheetData[i + off2]?.[pair.cell2.colIndex] || "");
 
-        // If history repeats at these positions (either exact same or same family repeat)
         if (targetJodi1 && targetJodi2 && (targetJodi1 === targetJodi2 || checkSameFamily(targetJodi1, targetJodi2))) {
           matchCount++;
           const posKey1 = `${off1}_${pair.cell1.colIndex}`;
@@ -319,11 +314,9 @@ const App: React.FC = () => {
     setManualHighlightedFamily([]);
   };
 
-  // --- MANUAL CLICK JODI HIGHLIGHT HANDLER ---
   const handleJodiCellClick = (jodiVal: string) => {
     if (!jodiVal || jodiVal.includes('*') || jodiVal.includes('✪')) return;
     const fam = getFamilyMembers(jodiVal);
-    // Toggle manual highlight if clicked again
     if (manualHighlightedFamily.length > 0 && manualHighlightedFamily.includes(jodiVal)) {
       setManualHighlightedFamily([]);
     } else {
@@ -338,7 +331,7 @@ const App: React.FC = () => {
           <h2 style={{ margin: '0 0 15px 0', fontSize: '18px', color: '#2c3e50' }}>Matka App Login</h2>
           <input 
             type="password" 
-            placeholder="Enter Security PIN (1234)" 
+            placeholder="Enter Security PIN" 
             value={loginPin} 
             onChange={(e) => setLoginPin(e.target.value)}
             style={{ width: '100%', padding: '10px', fontSize: '14px', marginBottom: '10px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }}
@@ -366,7 +359,6 @@ const App: React.FC = () => {
           Matka Pattern Finder App
         </h2>
 
-        {/* CONTROLS */}
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
           <label style={{ fontSize: '12px' }}>
             किमान जुळणाऱ्या जोड्या:
@@ -469,7 +461,15 @@ const App: React.FC = () => {
                   <tr key={`full-row-${rIdx}`} ref={isLastRow ? lastRowRef : null}>
                     {week.map((rawVal, cIdx) => {
                       if (cIdx === 0) {
-                        return <td key={`full-date-${rIdx}`} className="pdf-date-cell" style={{ padding: '2px 1px', fontSize: '10px', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{formatDateString(rawVal)}</td>;
+                        return (
+                          <td 
+                            key={`full-date-${rIdx}`} 
+                            className="pdf-date-cell" 
+                            style={{ padding: '2px 1px', fontSize: '10px', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}
+                          >
+                            {formatDateString(rawVal)}
+                          </td>
+                        );
                       }
 
                       const formattedVal = formatJodiVal(rawVal);
@@ -527,12 +527,11 @@ const App: React.FC = () => {
                       const isRed = isRedJodi(formattedVal);
                       const { diff, total } = calculateMetrics(formattedVal);
 
-                      // Manual Jodi Highlight Check
                       const isManualHighlight = manualHighlightedFamily.includes(formattedVal);
 
                       let cellBg = '#ffffff';
                       if (isManualHighlight) {
-                        cellBg = CUSTOM_HIGHLIGHT_COLOR; // Bright Green for Manual Clicks
+                        cellBg = CUSTOM_HIGHLIGHT_COLOR; 
                       } else if (matchedSets.length === 0 && isSelected) {
                         cellBg = '#a0c4ff'; 
                       } else if (isMatchedInOriginal || isMatchedInHistory || isRepeatMatch) {
@@ -585,7 +584,7 @@ const App: React.FC = () => {
           </table>
         </div>
 
-        {/* RIGHT PANEL: MATCHED RESULT + 10 NEXT ROWS */}
+        {/* RIGHT PANEL: MATCHED RESULT */}
         <div className="matches-wrapper" style={{ flex: 1, overflowX: 'auto', maxHeight: '80vh', overflowY: 'auto' }}>
           {currentMatch ? (
             <div className="panel-container">
@@ -665,12 +664,11 @@ const App: React.FC = () => {
                           const isRed = isRedJodi(formattedVal);
                           const { diff, total } = calculateMetrics(formattedVal);
 
-                          // Manual Jodi Highlight Check
                           const isManualHighlight = manualHighlightedFamily.includes(formattedVal);
 
                           let cellBg = '#ffffff';
                           if (isManualHighlight) {
-                            cellBg = CUSTOM_HIGHLIGHT_COLOR; // Bright Green
+                            cellBg = CUSTOM_HIGHLIGHT_COLOR; 
                           } else if (isMatch || isRepeatMatch) {
                             cellBg = famColor;
                           }
